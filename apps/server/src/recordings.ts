@@ -2,6 +2,9 @@ import type Database from "better-sqlite3";
 import { z } from "zod";
 import {
   recordingSchema,
+  investigationEventSchema,
+  investigationStatus,
+  type InvestigationEvent,
   runListSchema,
   runSchema,
   commandSchema,
@@ -100,6 +103,7 @@ export class Recordings {
     return recordingSchema.parse({
       run: readJson(row),
       attempts: this.attempts(id),
+      investigationHistory: this.investigationHistory(id),
       events: this.database
         .prepare("SELECT record FROM events WHERE run_id = ? ORDER BY sequence")
         .all(id)
@@ -126,6 +130,33 @@ export class Recordings {
       )
       .all(id)
       .map((row) => scenarioTruthSchema.parse(readJson(row)));
+  }
+
+  investigationHistory(runId: string): InvestigationEvent[] {
+    return this.database
+      .prepare(
+        "SELECT record FROM investigation_events WHERE run_id = ? ORDER BY sequence",
+      )
+      .all(runId)
+      .map((row) => investigationEventSchema.parse(readJson(row)));
+  }
+
+  investigationRequest(commandId: string): InvestigationEvent | null {
+    const row = this.database
+      .prepare(
+        "SELECT record FROM investigation_events WHERE json_extract(record, '$.request.commandId') = ?",
+      )
+      .get(commandId);
+    return row ? investigationEventSchema.parse(readJson(row)) : null;
+  }
+
+  saveInvestigation(value: InvestigationEvent) {
+    const event = investigationEventSchema.parse(value);
+    this.database
+      .prepare(
+        "INSERT INTO investigation_events (run_id, sequence, attempt_id, record) VALUES (?, ?, ?, ?)",
+      )
+      .run(event.runId, event.sequence, event.attemptId, JSON.stringify(event));
   }
 
   attempts(id: string): InferenceAttempt[] {
@@ -171,6 +202,11 @@ export class Recordings {
     )
       throw new Error("Inference request does not match its recorded snapshot");
     this.database.transaction(() => {
+      const previous = this.database
+        .prepare("SELECT record FROM inference_attempts WHERE id = ?")
+        .get(attempt.id);
+      const wasApplied =
+        previous && inferenceAttemptSchema.parse(readJson(previous)).appliedAt;
       this.database
         .prepare(
           `INSERT INTO inference_attempts (id, run_id, snapshot_id, simulation_time_ms, attempt_number, record)
@@ -184,6 +220,32 @@ export class Recordings {
           attempt.attemptNumber,
           JSON.stringify(attempt),
         );
+      const owner = run ?? this.run(attempt.runId);
+      if (
+        !wasApplied &&
+        attempt.appliedAt &&
+        attempt.status === "succeeded" &&
+        attempt.policy?.outcome === "incident_advisory" &&
+        owner?.manifest.schemaVersion === 2 &&
+        owner.manifest.investigation
+      ) {
+        const history = this.investigationHistory(attempt.runId);
+        const status = investigationStatus(history);
+        if (status === "none" || status === "closed")
+          this.saveInvestigation({
+            runId: attempt.runId,
+            sequence: (history.at(-1)?.sequence ?? 0) + 1,
+            runRevision: owner.revision,
+            simulationTimeMs: attempt.appliedSimulationTimeMs!,
+            recordedAt: attempt.appliedAt,
+            version: owner.manifest.investigation.version,
+            type: status === "none" ? "opened" : "reopened",
+            actor: "advisory-policy",
+            attemptId: attempt.id,
+            snapshotId: attempt.snapshotId,
+            request: null,
+          });
+      }
       if (run) this.commit(run);
     })();
   }

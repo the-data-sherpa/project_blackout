@@ -5,6 +5,7 @@ export * from "./runs.js";
 export * from "./telemetry.js";
 export * from "./decisions.js";
 export * from "./reports.js";
+export * from "./investigations.js";
 
 export const healthSchema = z.strictObject({
   status: z.literal("ok"),

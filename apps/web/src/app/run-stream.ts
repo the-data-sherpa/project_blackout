@@ -44,6 +44,8 @@ export function receiveRunMessage(
       ...previous,
       run,
       attempts: mergeAttempts(previous.attempts, [message.attempt]),
+      investigationHistory:
+        message.investigationHistory ?? previous.investigationHistory,
     };
   }
   let sequence = previous.run.lastSequence;
@@ -69,5 +71,7 @@ export function receiveRunMessage(
       ? [...previous.snapshots, message.snapshot]
       : previous.snapshots,
     attempts: mergeAttempts(previous.attempts, message.attempts ?? []),
+    investigationHistory:
+      message.investigationHistory ?? previous.investigationHistory,
   };
 }

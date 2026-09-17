@@ -246,7 +246,7 @@ it("publishes only committed records, and preserves them across reopen", () => {
   const reopened = openDatabase(path);
   try {
     expect(new Recordings(reopened).get(started.run.id)).toEqual(expected);
-    expect(reopened.pragma("user_version", { simple: true })).toBe(3);
+    expect(reopened.pragma("user_version", { simple: true })).toBe(4);
     expect(reopened.pragma("synchronous", { simple: true })).toBe(2);
   } finally {
     reopened.close();

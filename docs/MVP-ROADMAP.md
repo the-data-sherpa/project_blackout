@@ -1,6 +1,6 @@
 # PROJECT: BLACKOUT — Full MVP Roadmap
 
-Status: M1–M5 implemented; M6–M9 remain. See [M4 scenarios, measurements and limitations](M4-SCENARIOS.md).
+Status: M1–M6 implemented; M7–M9 remain. See [M4 scenarios, measurements and limitations](M4-SCENARIOS.md).
 Decision baseline: PRD review accepted by the owner on 2026-09-17.  
 Product specification: [PRD](PRD.md).  
 Implementation backlog: [31 approved GitHub tickets across M1–M9](MVP-TICKETS.md).
@@ -192,6 +192,8 @@ Exit criteria:
 - API outage does not create an indefinite wait or silently switch to playback.
 
 ## M6 — Decision console and incident lifecycle
+
+Implemented. See the [decision console and investigation guide](M6-CONSOLE.md) for thresholds, transitions, metrics and validation.
 
 Deliver:
 

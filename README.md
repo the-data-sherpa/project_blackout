@@ -6,7 +6,8 @@ and saved recordings, with observable evidence kept separate from scenario truth
 
 ## Current status
 
-M1–M5 are implemented, including interactive controls, reconnect recovery, the full scenario, benign control, and saved Jev reports.
+M1–M6 are implemented, including the decision timeline, correlated evidence,
+investigation history, interactive controls and saved Jev reports.
 The console starts a seeded 32-user, 16-host
 organization with 15 minutes of recorded baseline history. It streams authentication,
 host metrics, DNS and network events, and records five rolling windows with
@@ -25,6 +26,7 @@ See the [M2 walkthrough and state rules](docs/OBSERVABLE-STATE.md).
 See the [M3 evaluator and measurement guide](docs/JEV-EVALUATION.md).
 See the [M4 scenarios, schedule and evaluation](docs/M4-SCENARIOS.md).
 See the [M5 controls, timing and reconnect guide](docs/M5-CONTROLS.md).
+See the [M6 decision console and investigation guide](docs/M6-CONSOLE.md).
 
 ## Quick start with Docker
 
@@ -136,6 +138,19 @@ Actions are advisory. The application
 does not contain or remediate threats. Confidence is distribution concentration, not measured
 correctness. Noul has no separate confidence field.
 
+## Inspect decisions and manage an investigation
+
+Select a point in **Decision timeline** to hold its exact snapshot, response,
+policy rules and event evidence. Event filters stay within the selected
+snapshot’s time. The console shows attempt/decision counts, decisions per
+simulation minute, latency summaries and the latest successful decision’s age.
+
+An applied incident advisory opens an **Investigation**. Use **Acknowledge
+investigation** or **Close investigation** to record a local operator action.
+Falling risk and stopping injection do not close it. The next matching decision
+after closure reopens it. Actions preserve evidence and do not remediate entities.
+See [policy transitions, metric definitions and verification](docs/M6-CONSOLE.md).
+
 ## Measure the first model slice
 
 With the backend running and its Jev key configured:
@@ -246,5 +261,6 @@ storage behavior.
 - [Full MVP roadmap: milestones M1–M9 and acceptance criteria](docs/MVP-ROADMAP.md)
 - [Published GitHub tickets and blocking dependencies](docs/MVP-TICKETS.md)
 
-The next milestone, M6, adds the decision timeline, filtered evidence and incident lifecycle.
+The next milestone, M7, adds recorded playback, temporal seeking, deterministic
+telemetry reruns and fresh model reevaluation.
 The full MVP requires milestones M1–M9.

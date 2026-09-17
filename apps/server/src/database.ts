@@ -22,8 +22,8 @@ export function openDatabase(filename: string) {
 
 function migrate(database: Database.Database) {
   const version = database.pragma("user_version", { simple: true });
-  if (version === 3) return;
-  if (version !== 0 && version !== 1 && version !== 2)
+  if (version === 4) return;
+  if (version !== 0 && version !== 1 && version !== 2 && version !== 3)
     throw new Error(`Unsupported database version: ${String(version)}`);
   if (version === 0)
     database.transaction(() => {
@@ -69,8 +69,9 @@ function migrate(database: Database.Database) {
       PRAGMA user_version = 2;
     `);
     })();
-  database.transaction(() => {
-    database.exec(`
+  if (version !== 3)
+    database.transaction(() => {
+      database.exec(`
       CREATE TABLE inference_attempts (
         id TEXT PRIMARY KEY,
         run_id TEXT NOT NULL,
@@ -86,6 +87,20 @@ function migrate(database: Database.Database) {
         record TEXT NOT NULL
       );
       PRAGMA user_version = 3;
+    `);
+    })();
+  database.transaction(() => {
+    database.exec(`
+      CREATE TABLE investigation_events (
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        sequence INTEGER NOT NULL,
+        attempt_id TEXT REFERENCES inference_attempts(id),
+        record TEXT NOT NULL,
+        PRIMARY KEY (run_id, sequence)
+      );
+      CREATE UNIQUE INDEX investigation_request ON investigation_events(json_extract(record, '$.request.commandId'));
+      CREATE UNIQUE INDEX investigation_attempt ON investigation_events(attempt_id) WHERE attempt_id IS NOT NULL;
+      PRAGMA user_version = 4;
     `);
   })();
 }

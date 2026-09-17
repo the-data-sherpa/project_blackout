@@ -12,8 +12,7 @@ import {
   type Recording,
 } from "@blackout/contracts";
 import { RunBrowser } from "./run-browser";
-import { TelemetryInspector } from "./telemetry-inspector";
-import { DecisionInspector } from "./decision-inspector";
+import { RunInspection } from "./run-inspection";
 import { EvaluationReports } from "./evaluation-reports";
 import { useRunStream } from "./use-run-stream";
 import { RunControls } from "./run-controls";
@@ -459,15 +458,19 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               )}
             </pre>
           </details>
-          <DecisionInspector
-            key={`decisions-${run.id}`}
+          <RunInspection
+            key={`inspection-${run.id}`}
             recording={recording}
             connected={stream === "Connected"}
-          />
-          <TelemetryInspector
-            key={run.id}
-            recording={recording}
             backendUrl={backendUrl}
+            onSaved={(saved) =>
+              setRecording((previous) =>
+                previous?.run.id === saved.run.id &&
+                previous.run.revision > saved.run.revision
+                  ? previous
+                  : saved,
+              )
+            }
           />
         </section>
       )}

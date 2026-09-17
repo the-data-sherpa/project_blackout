@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import type { Recording } from "@blackout/contracts";
+import { visibleAttempts } from "./decision-view";
+import { DecisionTimeline } from "./decision-timeline";
 
 function Json({ title, children }: { title: string; children: unknown }) {
   return (
@@ -25,52 +27,28 @@ function Value({ label, children }: { label: string; children: ReactNode }) {
 export function DecisionInspector({
   recording,
   connected,
+  selectedId,
+  onSelect,
 }: {
   recording: Recording;
   connected: boolean;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(() =>
-    typeof window === "undefined"
-      ? null
-      : new URL(window.location.href).searchParams.get("decision"),
-  );
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
   const { attempts, run } = recording;
-  const liveAttempts =
-    run.status === "running" &&
-    run.controls?.paused &&
-    run.controls.pausedAttemptId !== undefined
-      ? attempts.slice(
-          0,
-          attempts.findIndex(
-            (attempt) => attempt.id === run.controls!.pausedAttemptId,
-          ) + 1,
-        )
-      : attempts;
-  const visible = liveAttempts.map((attempt) =>
-    run.status === "running" &&
-    attempt.appliedAt === null &&
-    attempt.status !== "pending"
-      ? {
-          ...attempt,
-          status: "pending" as const,
-          response: null,
-          error: null,
-          policy: null,
-          completedAt: null,
-          latencyMs: null,
-          responseBody: null,
-        }
-      : attempt,
-  );
+  const visible = visibleAttempts(recording);
   const latest = visible.at(-1);
-  const success = visible.findLast((attempt) => attempt.status === "succeeded");
-  const selected =
-    attempts.find((attempt) => attempt.id === selectedId) ?? latest;
+  const success = visible.findLast(
+    (attempt) => attempt.status === "succeeded" && attempt.appliedAt !== null,
+  );
+  const selected = selectedId
+    ? attempts.find((attempt) => attempt.id === selectedId)
+    : latest;
   const enabled = run.manifest.schemaVersion === 2 && !!run.manifest.evaluation;
   const active = run.status === "running";
   const pending = latest?.status === "pending";
@@ -107,6 +85,19 @@ export function DecisionInspector({
       <p role="status" className="text-sm text-violet-200">
         {state}
       </p>
+      <DecisionTimeline
+        recording={recording}
+        selectedId={selectedId}
+        onSelect={onSelect}
+      />
+      {selectedId && !selected && (
+        <p role="alert" className="text-amber-200">
+          This decision is not in this recording.{" "}
+          <button className="min-h-11 underline" onClick={() => onSelect(null)}>
+            Follow latest attempt
+          </button>
+        </p>
+      )}
       {!enabled ? (
         <p className="text-sm text-slate-300">
           This run contains telemetry only. Enable “Evaluate with Jev” when
@@ -141,11 +132,7 @@ export function DecisionInspector({
                       event.target.value === "latest"
                         ? null
                         : event.target.value;
-                    setSelectedId(id);
-                    const url = new URL(window.location.href);
-                    if (id) url.searchParams.set("decision", id);
-                    else url.searchParams.delete("decision");
-                    window.history.replaceState(null, "", url);
+                    onSelect(id);
                   }}
                 >
                   <option value="latest">Follow latest attempt</option>
@@ -160,7 +147,7 @@ export function DecisionInspector({
               <p className="text-xs text-slate-400">
                 {selectedId
                   ? active
-                    ? "Inspecting a saved attempt. Live decisions continue above."
+                    ? "Inspecting a saved attempt. Its snapshot and event cutoff are held below; live decisions continue above."
                     : "Inspecting a saved attempt from this recording."
                   : "Following the newest attempt."}
               </p>

@@ -9,6 +9,7 @@ compromise and benign maintenance scenarios join two minimal comparison fixtures
 scenario truth stays separate. Stored runs remain
 inspectable after restart. Bounded runs complete automatically. Opt-in Jev evaluation
 records model decisions and policies. M5 adds interactive controls and reconnect recovery; see [the control contract](M5-CONTROLS.md).
+M6 adds correlated decision inspection, metrics and durable [investigation actions](M6-CONSOLE.md).
 See [Jev evaluation](JEV-EVALUATION.md) for pacing and earlier reports, and
 [M4 scenarios](M4-SCENARIOS.md) for current input contracts, schedules and the runner.
 
@@ -38,9 +39,9 @@ WebSocket plugin in one server. SQLite uses `better-sqlite3`, with WAL, foreign
 keys, and a five-second busy timeout. Schema version 1 adds run, command, and event
 tables in one migration. Version 2 adds snapshots and separate scenario truth,
 tracked by `PRAGMA user_version`. Version 3 adds inference attempts and evaluation
-reports. M1/M2 recordings retain their original payloads.
-A newer, unsupported
-database version fails startup rather than being rewritten.
+reports. Version 4 adds ordered investigation events and idempotent local actions.
+Older recordings retain their original payloads. A newer, unsupported database
+version fails startup rather than being rewritten.
 
 TypeScript is pinned to 6.0.3, within the installed TypeScript ESLint parser's
 supported range. Node 24 LTS is pinned across local setup, CI, and Docker; use the
@@ -190,7 +191,7 @@ stored payloads return a storage error, rather than blaming the request input.
 | `POST /api/runs/:id/commands`     | Accepts a UUID command ID and a supported control; returns the saved recording. See [M5 control payloads](M5-CONTROLS.md#api-and-recording-contract).                                                                                                                                                                                                                                                                                                        |
 | `GET /api/runs?offset=0&limit=20` | Lists run summaries, total count, next offset, and active run ID. Limit accepts 1–100; offset accepts 0–1,000,000. It does not load event bodies.                                                                                                                                                                                                                                                                                                            |
 | `GET /api/runs/active`            | Returns `{ "runId": "…" }` or `{ "runId": null }`.                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `GET /api/runs/:id`               | Returns the manifest, status, clock, ordered events, commands and snapshots from SQLite; no truth rows.                                                                                                                                                                                                                                                                                                                                                      |
+| `GET /api/runs/:id`               | Returns the manifest, status, clock, ordered events, commands, snapshots, inference attempts and investigation history from SQLite; no truth rows.                                                                                                                                                                                                                                                                                                           |
 | `GET /api/runs/:id/truth`         | Returns `{ "records": [...] }` from the separate truth table for explicit fixture evaluation.                                                                                                                                                                                                                                                                                                                                                                |
 | `GET /ws?runId=<uuid>`            | Sends `connection.ready`, a full saved `run.snapshot`, then committed `run.updated` event batches with their snapshot and any applied commands, `inference.updated` attempts, or `recording.error`. Omitting `runId` gives only the connection check.                                                                                                                                                                                                        |
 
@@ -204,6 +205,9 @@ the HTTP read and socket subscription. Each update carries the durable run revis
 the console resynchronizes automatically after disconnect or a sequence gap. It
 batches rendering separately from simulation progress. Slow clients disconnect
 when their outbound buffer exceeds the initial recording transfer plus 1 MiB.
+See [M6 investigations](M6-CONSOLE.md#storage-and-api) for the
+`POST /api/runs/:id/investigation-actions` API, atomic history and migration.
+
 See [M5 controls](M5-CONTROLS.md) for command idempotency, reset transactions,
 pause-time arrival, resume-time application and pacing.
 

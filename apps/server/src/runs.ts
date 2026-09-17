@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import {
   controlRunSchema,
+  investigationActionSchema,
+  investigationStatus,
   runMessageSchema,
   startRunSchema,
   type InferenceAttempt,
@@ -100,6 +102,13 @@ export class Runs {
       manifest.policyVersion = this.evaluator.policy.version;
       manifest.evaluatorVersion = questionVersion;
       manifest.requestedModel = this.evaluator.model;
+      manifest.investigation = {
+        version: "investigation-policy/1",
+        trigger: "incident_advisory",
+        consecutiveDecisions: 1,
+        resolution: "operator-only",
+        afterClosure: "reopen-on-next-matching-decision",
+      };
     }
     const run: Run = {
       id: randomUUID(),
@@ -323,7 +332,8 @@ export class Runs {
         };
     }
     this.recordings.transaction(() => {
-      for (const attempt of applied) this.recordings.saveAttempt(attempt);
+      for (const attempt of applied)
+        this.recordings.saveAttempt(attempt, updated);
       this.recordings.commit(updated, [], undefined, undefined, [command]);
     });
     this.current = updated.status === "running" ? updated : null;
@@ -334,6 +344,63 @@ export class Runs {
       events: [],
       commands: [command],
       attempts: applied,
+      investigationHistory: this.recordings.investigationHistory(runId),
+    });
+    return this.recordings.get(runId)!;
+  }
+
+  investigate(runId: string, input: unknown) {
+    const request = investigationActionSchema.parse(input);
+    this.available();
+    const previous = this.recordings.investigationRequest(request.commandId);
+    if (previous) {
+      if (
+        previous.runId !== runId ||
+        JSON.stringify(previous.request) !== JSON.stringify(request)
+      )
+        throw new RunError(
+          "command_conflict",
+          "This action ID was already used for a different request.",
+        );
+      return this.recordings.get(runId)!;
+    }
+    const run = this.recordings.run(runId);
+    const history = this.recordings.investigationHistory(runId);
+    const status = investigationStatus(history);
+    if (
+      !run ||
+      history.at(-1)?.sequence !== request.expectedSequence ||
+      (request.type === "acknowledge"
+        ? status !== "open"
+        : status !== "open" && status !== "acknowledged")
+    )
+      throw new RunError(
+        "invalid_transition",
+        "The investigation changed or this action is unavailable. Refresh the recording before trying again.",
+      );
+    const updated = this.revise(run);
+    this.recordings.transaction(() => {
+      this.recordings.saveInvestigation({
+        runId,
+        sequence: request.expectedSequence + 1,
+        runRevision: updated.revision,
+        simulationTimeMs: run.simulationTimeMs,
+        recordedAt: new Date().toISOString(),
+        version: "investigation-policy/1",
+        type: request.type === "acknowledge" ? "acknowledged" : "closed",
+        actor: "local-operator",
+        attemptId: null,
+        snapshotId: null,
+        request,
+      });
+      this.recordings.commit(updated);
+    });
+    if (this.current?.id === runId) this.current = updated;
+    this.publish({
+      type: "run.updated",
+      run: updated,
+      events: [],
+      investigationHistory: this.recordings.investigationHistory(runId),
     });
     return this.recordings.get(runId)!;
   }
@@ -586,6 +653,9 @@ export class Runs {
             runId: owner.id,
             run: updated,
             attempt,
+            investigationHistory: this.recordings.investigationHistory(
+              owner.id,
+            ),
           });
         },
         signal,

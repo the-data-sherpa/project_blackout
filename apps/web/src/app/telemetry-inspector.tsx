@@ -168,9 +168,11 @@ function EventTable({
 export function TelemetryInspector({
   recording,
   backendUrl,
+  decisionId = null,
 }: {
   recording: Recording;
   backendUrl: string;
+  decisionId?: string | null;
 }) {
   const [phase, setPhase] = useState("live");
   const [kind, setKind] = useState("all");
@@ -195,10 +197,16 @@ export function TelemetryInspector({
   const host =
     organization?.hosts.find((item) => item.id === hostId) ??
     organization?.hosts[0];
+  const selectedDecision = recording.attempts.find(
+    (item) => item.id === decisionId,
+  );
+  const evidenceSnapshotId = decisionId
+    ? selectedDecision?.snapshotId
+    : snapshotId;
   const snapshot =
-    snapshotId === "latest"
+    evidenceSnapshotId === "latest"
       ? recording.snapshots.at(-1)
-      : recording.snapshots.find((item) => item.id === snapshotId);
+      : recording.snapshots.find((item) => item.id === evidenceSnapshotId);
   const window = snapshot?.input.windows.find(
     (item) => item.durationMs === windowMs,
   );
@@ -212,6 +220,9 @@ export function TelemetryInspector({
   );
   const events = recording.events.filter(
     (event) =>
+      (!decisionId || !!selectedDecision) &&
+      event.simulationTimeMs <=
+        (snapshot?.simulationTimeMs ?? recording.run.simulationTimeMs) &&
       (phase === "all" ||
         (phase === "warmup"
           ? event.simulationTimeMs < 0
@@ -366,12 +377,23 @@ export function TelemetryInspector({
             its evidence. Selection holds that snapshot while generation
             continues.
           </p>
+          {decisionId && (
+            <p
+              className="mt-3 text-sm text-emerald-200"
+              data-testid="decision-evidence"
+            >
+              Evidence for selected decision · {snapshot.id} ·{" "}
+              {seconds(snapshot.simulationTimeMs)}. Choose “Follow latest
+              attempt” in the Decision Inspector to release this snapshot.
+            </p>
+          )}
           <div className="my-4 flex flex-wrap gap-4">
             <label className="min-w-0 text-sm">
               Snapshot
               <select
                 name="snapshot"
-                value={snapshotId}
+                value={evidenceSnapshotId ?? "latest"}
+                disabled={!!decisionId}
                 className={`${control} mt-2 block`}
                 onChange={(event) => setSnapshotId(event.target.value)}
               >
@@ -525,6 +547,8 @@ export function TelemetryInspector({
         <p className="mb-4 text-sm text-slate-400">
           Oldest first, ordered by sequence. Warning describes an observed
           failure or high host utilization; it is not an attack label.
+          {snapshot &&
+            ` Showing observations through ${seconds(snapshot.simulationTimeMs)}, the selected snapshot’s time.`}
         </p>
         <div className="mb-4 grid min-w-0 gap-3 sm:grid-cols-3">
           <label className="min-w-0 text-sm">

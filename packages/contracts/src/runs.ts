@@ -1,5 +1,9 @@
 import { z } from "zod";
 import {
+  investigationConfigSchema,
+  investigationEventSchema,
+} from "./investigations.js";
+import {
   evaluationConfigSchema,
   inferenceAttemptSchema,
   policyConfigSchema,
@@ -108,6 +112,7 @@ export const telemetryManifestSchema = legacyManifestSchema
     scenario: scenarioPlanSchema.optional(),
     evaluation: evaluationConfigSchema.optional(),
     policy: policyConfigSchema.optional(),
+    investigation: investigationConfigSchema.optional(),
     interactive: z.boolean().optional(),
     interactiveScenarioVersion: z.literal("scenarios/1").optional(),
   })
@@ -224,6 +229,7 @@ export const recordingSchema = z.strictObject({
   commands: z.array(commandSchema),
   snapshots: z.array(observableSnapshotSchema).default([]),
   attempts: z.array(inferenceAttemptSchema).default([]),
+  investigationHistory: z.array(investigationEventSchema).default([]),
 });
 
 export const activeRunSchema = z.strictObject({
@@ -247,6 +253,7 @@ export const runMessageSchema = z.discriminatedUnion("type", [
     runId: runIdSchema,
     run: runSchema,
     attempt: inferenceAttemptSchema,
+    investigationHistory: z.array(investigationEventSchema).optional(),
   }),
   z.strictObject({
     type: z.literal("run.snapshot"),
@@ -259,6 +266,7 @@ export const runMessageSchema = z.discriminatedUnion("type", [
     snapshot: observableSnapshotSchema.optional(),
     commands: z.array(commandSchema).optional(),
     attempts: z.array(inferenceAttemptSchema).optional(),
+    investigationHistory: z.array(investigationEventSchema).optional(),
   }),
   z.strictObject({
     type: z.literal("recording.error"),

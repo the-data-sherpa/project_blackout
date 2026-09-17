@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   activeRunSchema,
   controlRunSchema,
+  investigationActionSchema,
   apiErrorSchema,
   healthSchema,
   recordingSchema,
@@ -116,6 +117,24 @@ export async function buildApp(options: AppOptions) {
       model: options.evaluator?.model ?? "jev-1.13.0",
       config: options.evaluator?.config ?? defaultEvaluation,
     }));
+
+    app.post("/api/runs/:id/investigation-actions", async (request, reply) => {
+      const { id } = parseInput(
+        z.strictObject({ id: runIdSchema }),
+        request.params,
+      );
+      if (!service.recordings.run(id))
+        return reply.code(404).send(
+          apiErrorSchema.parse({
+            code: "not_found",
+            message: "This recording was not found.",
+          }),
+        );
+      return service.investigate(
+        id,
+        parseInput(investigationActionSchema, request.body),
+      );
+    });
 
     app.get("/api/evaluation-reports", async () => ({
       reports: service.recordings.reports(),
