@@ -1,0 +1,48 @@
+{
+  "name": "project-blackout",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": "^24.21.0",
+    "npm": ">=11"
+  },
+  "scripts": {
+    "dev": "npm run build:contracts && concurrently --kill-others -n contracts,server,web \"npm run dev -w @blackout/contracts\" \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:server": "dotenv -e .env -- tsx watch --include \"packages/contracts/dist/**/*.js\" apps/server/src/index.ts",
+    "dev:web": "dotenv -e .env -- next dev apps/web --hostname 127.0.0.1",
+    "build:contracts": "npm run build -w @blackout/contracts",
+    "build": "npm run build:contracts && npm run build -w @blackout/server && npm run build -w @blackout/web",
+    "start": "concurrently --kill-others -n server,web \"npm run start:server\" \"npm run start:web\"",
+    "start:server": "dotenv -e .env -- node apps/server/dist/index.js",
+    "start:web": "dotenv -e .env -- node scripts/start-web.mjs",
+    "typecheck": "npm run build:contracts && npm run typecheck --workspaces",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build:contracts && vitest run",
+    "test:watch": "npm run build:contracts && vitest",
+    "test:e2e": "playwright test",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^24.0.0",
+    "concurrently": "^9.0.0",
+    "dotenv-cli": "11.0.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.5",
+    "eslint-config-prettier": "^10.0.0",
+    "globals": "^17.0.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.1"
+  }
+}

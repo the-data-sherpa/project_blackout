@@ -1,0 +1,22 @@
+{
+  "name": "@blackout/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@blackout/contracts": "0.0.0",
+    "@fastify/cors": "11.3.0",
+    "@fastify/websocket": "11.3.0",
+    "better-sqlite3": "13.0.3",
+    "fastify": "5.12.5",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/ws": "^8.0.0"
+  }
+}

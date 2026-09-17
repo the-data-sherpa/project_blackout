@@ -1,0 +1,16 @@
+node_modules/
+.next/
+dist/
+data/
+coverage/
+playwright-report/
+test-results/
+package-lock.json
+**/next-env.d.ts
+.lavish/
+.scratch/
+AGENTS.md
+docs/agents/
+docs/PRD.md
+docs/MVP-ROADMAP.md
+docs/MVP-TICKETS.md
