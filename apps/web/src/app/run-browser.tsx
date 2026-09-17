@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { runListSchema, type RunList } from "@blackout/contracts";
+import {
+  apiErrorSchema,
+  runListSchema,
+  storageUsageSchema,
+  type RunList,
+} from "@blackout/contracts";
 
 const buttonClass =
   "min-h-11 rounded border border-slate-500 px-4 py-2 text-sm hover:border-emerald-300 disabled:opacity-50";
 const pageSize = 20;
+function size(bytes: number) {
+  return `${(bytes / 1024 / 1024).toFixed(2)} MiB`;
+}
 
 export function RunBrowser({
   backendUrl,
@@ -13,18 +21,26 @@ export function RunBrowser({
   refreshKey,
   onSelect,
   onActiveRun,
+  onDeleted,
 }: {
   backendUrl: string;
   selectedId: string | null;
   refreshKey: string;
   onSelect: (id: string) => void;
   onActiveRun: (id: string | null) => void;
+  onDeleted: (id: string) => void;
 }) {
   const [page, setPage] = useState<RunList | null>(null);
   const [offset, setOffset] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [storage, setStorage] = useState<ReturnType<
+    typeof storageUsageSchema.parse
+  > | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deletionError, setDeletionError] = useState<string | null>(null);
+  const [deleted, setDeleted] = useState<string | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -37,14 +53,21 @@ export function RunBrowser({
         const url = new URL("/api/runs", backendUrl);
         url.searchParams.set("offset", String(offset));
         url.searchParams.set("limit", String(pageSize));
-        const response = await fetch(url, {
-          signal: controller.signal,
-          cache: "no-store",
-        });
-        if (!response.ok) throw new Error("Recording list unavailable");
-        const saved = runListSchema.parse(await response.json());
+        const [response, usage] = await Promise.all(
+          [url, new URL("/api/storage", backendUrl)].map((address) =>
+            fetch(address, {
+              signal: controller.signal,
+              cache: "no-store",
+            }),
+          ),
+        );
+        if (!response!.ok || !usage!.ok)
+          throw new Error("Recording list unavailable");
+        const saved = runListSchema.parse(await response!.json());
+        const stored = storageUsageSchema.parse(await usage!.json());
         if (!disposed) {
           setPage(saved);
+          setStorage(stored);
           onActiveRun(saved.activeRunId);
         }
       } catch {
@@ -61,6 +84,36 @@ export function RunBrowser({
       window.clearTimeout(timeout);
     };
   }, [backendUrl, offset, attempt, refreshKey, onActiveRun]);
+
+  async function deleteRun(run: RunList["runs"][number]) {
+    if (
+      !window.confirm(
+        `Permanently delete recording ${run.seed} (${run.id}) and its owned evidence? This cannot be undone. Saved evaluation summaries remain, with this recording marked unavailable.`,
+      )
+    )
+      return;
+    setDeleting(run.id);
+    setDeletionError(null);
+    setDeleted(null);
+    try {
+      const response = await fetch(new URL(`/api/runs/${run.id}`, backendUrl), {
+        method: "DELETE",
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok)
+        throw new Error(apiErrorSchema.parse(await response.json()).message);
+      setDeleted(run.id);
+      onDeleted(run.id);
+      setOffset(0);
+      setAttempt((value) => value + 1);
+    } catch (cause) {
+      setDeletionError(
+        `${cause instanceof Error ? cause.message : "Deletion could not be confirmed."} Refresh runs to check storage, then retry if the recording remains.`,
+      );
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   return (
     <section
@@ -84,8 +137,29 @@ export function RunBrowser({
       </div>
       <p className="mt-3 text-sm text-slate-400">
         Open a recording to inspect its saved events. Completed and interrupted
-        runs stay stopped.
+        runs stay stopped. Recordings are kept until you delete them. Reset and
+        restart preserve history.
       </p>
+      {storage && (
+        <p className="mt-3 text-sm text-slate-300" data-testid="storage-usage">
+          Recordings: {size(storage.recordingBytes)} · Reports:{" "}
+          {size(storage.reportBytes)} · SQLite pages:{" "}
+          {size(storage.databaseBytes)} · Reusable:{" "}
+          {size(storage.reusableBytes)} · Write-ahead log:{" "}
+          {size(storage.walBytes)}. Row sizes count owned JSON; shared evidence
+          is counted at its source. Deleted space is reused by later runs.
+        </p>
+      )}
+      {deletionError && (
+        <p role="alert" className="mt-3 text-amber-200">
+          {deletionError}
+        </p>
+      )}
+      {deleted && (
+        <p role="status" className="mt-3 break-all text-sm text-slate-300">
+          Deleted recording {deleted}.
+        </p>
+      )}
       {error && (
         <p role="alert" className="mt-4 text-sm text-amber-200">
           Could not load stored runs. Check the backend, then refresh runs. Any
@@ -137,6 +211,36 @@ export function RunBrowser({
                   {new Date(run.createdAt).toLocaleString()}
                 </time>
               </button>
+              {run.storage && (
+                <div className="mt-2 flex flex-wrap items-center gap-3 px-2 text-sm text-slate-300">
+                  <span>
+                    {size(run.storage.ownedBytes)} owned
+                    {run.storage.sharedSourceRunId
+                      ? " · shares source evidence"
+                      : ""}
+                  </span>
+                  <button
+                    className={buttonClass}
+                    aria-label={`Delete recording ${run.id}`}
+                    disabled={
+                      loading ||
+                      deleting !== null ||
+                      run.storage.deletionBlockers.length > 0
+                    }
+                    onClick={() => void deleteRun(run)}
+                  >
+                    {deleting === run.id ? "Deleting…" : "Delete recording"}
+                  </button>
+                  {run.storage.deletionBlockers.map((reason) => (
+                    <p
+                      key={reason}
+                      className="w-full break-words text-xs text-amber-200"
+                    >
+                      {reason}
+                    </p>
+                  ))}
+                </div>
+              )}
             </li>
           ))}
         </ul>

@@ -6,7 +6,7 @@ and saved recordings, with observable evidence kept separate from scenario truth
 
 ## Current status
 
-M1–M8 are implemented, including recorded playback, correlated decision and
+M1–M9 are implemented, including recorded playback, correlated decision and
 event inspection, interactive controls, saved Jev reports and the evidence-based
 environment topology. The console starts a seeded 32-user, 16-host organization
 with 15 minutes of recorded baseline history. It streams authentication, host
@@ -29,6 +29,7 @@ See the [M5 controls, timing and reconnect guide](docs/M5-CONTROLS.md).
 See the [M6 decision console and investigation guide](docs/M6-CONSOLE.md).
 See the [M7 playback, seeking, rerun and reevaluation guide](docs/M7-PLAYBACK.md).
 See the [M8 evidence topology and complete console guide](docs/M8-TOPOLOGY.md).
+See the [M9 release, saved demonstration and cleanup guide](docs/M9-RELEASE.md).
 
 ## Quick start with Docker
 
@@ -89,6 +90,21 @@ mise exec -- npm run dev
 Stop Compose before starting local development: both use ports 3000 and 3001.
 Local development stores SQLite at `data/blackout.sqlite`, separately from the
 Docker volume.
+
+## Recorded demonstration and storage
+
+A portable demo contains actual Jev responses for a baseline, full attack and
+benign control. It works without a key or internet after installation. Follow
+the [demo installation and presenter walkthrough](docs/M9-RELEASE.md#install-the-recorded-demonstration)
+to use a separate database or Compose project; installation refuses to overwrite
+existing recordings.
+
+**Stored runs** shows storage use and offers **Delete recording** with an explicit
+confirmation. Active runs and sources with linked recordings are protected;
+delete linked recordings first. Reset and restart preserve history. Evaluation
+summaries remain after raw evidence is deleted, with unavailable links labeled.
+SQLite reuses freed space; its file need not shrink. See
+[retention, storage budgets and recovery](docs/M9-RELEASE.md#retention-and-cleanup).
 
 ## Control an interactive run
 
@@ -186,6 +202,7 @@ The [saved report](docs/evaluations/m3-follow-up-suite.json) preserves every out
 ```bash
 npm run evaluate -- --m4 --smoke # One full attack, 20 checkpoints
 npm run evaluate -- --m4         # Three seeds × baseline/attack/benign, 180 checkpoints
+npm run evaluate -- --m4 --speed=5 # Same suite at checkpoint-preserving 5× requested speed
 ```
 
 Each run lasts 95 simulation seconds; injection stops at 35 seconds while baseline
@@ -241,6 +258,7 @@ npm run check       # Formatting, lint, type checking, unit/integration tests
 npm run build       # Build shared contracts, backend, and web app
 npx playwright install chromium
 npm run test:e2e    # Browser tests against the production build
+npm run test:release # Isolated Compose build, demo install and packaged browser rehearsal
 ```
 
 Vitest checks transport contracts, configuration, deterministic generation,
@@ -268,5 +286,7 @@ synchronization and sustained-load console budgets are implemented. The
 [M8 guide](docs/M8-TOPOLOGY.md) records the rule, selection behavior and measured
 browser budgets.
 
-The next milestone, M9, packages and verifies the full MVP. The full MVP requires
-milestones M1–M9.
+M9 adds safe recording cleanup, a portable real-response demonstration, a final
+model evaluation and an isolated packaged rehearsal. See the
+[release evidence and limitations](docs/M9-RELEASE.md) and
+[codebase assessment](docs/CODEBASE-EVALUATION.md).

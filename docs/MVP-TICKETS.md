@@ -7,7 +7,7 @@ The ticket bodies contain acceptance criteria and blocking references. Native Gi
 
 ## Working order
 
-M1–M7 are implemented. Continue with [#25 — Explore observed relationships in a live topology](https://github.com/the-data-sherpa/project_blackout/issues/25).
+M1–M9 are implemented. The [M9 release guide](M9-RELEASE.md) records packaged verification, storage cleanup, the saved demonstration and final evaluation. GitHub ticket state is managed separately from this implementation record.
 The [M7 playback guide](M7-PLAYBACK.md) records seek measurements and linked reevaluation evidence.
 The [M4 evaluation guide](M4-SCENARIOS.md) records real-API results and unmet targets; the [M3 evaluation guide](JEV-EVALUATION.md) preserves earlier results, misses and input revisions.
 Work any ticket whose blocking issues are all complete. A readiness label describes specification readiness; dependencies determine when work can start.

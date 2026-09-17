@@ -177,7 +177,8 @@ operator chooses **Refresh runs**. Selecting a completed, failed, or interrupted
 recording reads its records without opening a generation stream or calling Jev.
 An active run continues while the operator inspects a different recording;
 **View active run** returns to it. List errors retain the last loaded rows with
-an error message. No recording deletion or automatic retention limit is applied.
+an error message. Explicit selected deletion is available; there is no automatic
+retention limit. See [M9 storage accounting, protection and recovery](M9-RELEASE.md#retention-and-cleanup).
 
 If a write fails and failure status cannot be saved, the database retains the
 previous committed `running` status. The active process stops generation and
@@ -228,6 +229,11 @@ The `blackout-data` named volume stores `/app/data/blackout.sqlite`. Container
 restarts, rebuilds, and `docker compose down` preserve it. Do not use
 `docker compose down --volumes` unless you intend to delete that database.
 Host development storage and Compose storage are separate.
+
+`npm run test:release` builds a unique Compose project with a fresh volume and
+performs the packaged browser rehearsal, including offline demo installation,
+restart/reconnect and cleanup. Its test volume is disposable; it never uses the
+development or default Compose database. CI runs this check separately.
 
 ## Framework references
 

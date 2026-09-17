@@ -1,6 +1,6 @@
 # PROJECT: BLACKOUT — Full MVP Roadmap
 
-Status: M1–M8 implemented; M9 remains. See [M8 evidence topology and complete console](M8-TOPOLOGY.md).
+Status: M1–M9 implemented. See [release verification and remaining limitations](M9-RELEASE.md).
 Decision baseline: PRD review accepted by the owner on 2026-09-17.  
 Product specification: [PRD](PRD.md).  
 Implementation backlog: [31 approved GitHub tickets across M1–M9](MVP-TICKETS.md).
@@ -267,6 +267,8 @@ Exit criteria:
 - UI remains usable while waiting for Jev, disconnected, paused, and replaying.
 
 ## M9 — Full MVP release readiness
+
+Implemented. See the [release guide](M9-RELEASE.md) for installation, the portable demonstration, measured evaluation, retention, verification and full milestone coverage.
 
 Deliver:
 

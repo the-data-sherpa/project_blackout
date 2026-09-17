@@ -1,0 +1,19 @@
+{
+  "verifiedAt": "2026-09-17T20:28:35.841Z",
+  "checks": [
+    "clean Compose launch, bundled demo and missing-key configuration",
+    "demo installer refuses to overwrite recordings",
+    "offline recorded seeking, evidence and unresolved investigation; source unchanged",
+    "packaged baseline, begin attack, escalation, pause/inspect/resume, stop and continuing baseline with explicit unavailable inference",
+    "volume persistence, reset retention, backend outage/restart and browser reconnect",
+    "deterministic rerun, fresh unavailable reevaluation, source protection and selected cleanup"
+  ],
+  "storage": {
+    "databaseBytes": 40042496,
+    "reusableBytes": 16330752,
+    "walBytes": 8116432,
+    "recordingBytes": 21159493,
+    "reportBytes": 23263
+  },
+  "demo": "2e67bf4e-85ee-4f08-8bb5-8e695a5251e3"
+}

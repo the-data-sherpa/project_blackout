@@ -54,6 +54,8 @@ export class Runs {
   private readonly evaluator: Evaluator;
   private pending: Promise<void> | null = null;
   private readonly outstanding = new Set<Promise<void>>();
+  private readonly reevaluations = new Set<Promise<unknown>>();
+  private readonly reevaluationController = new AbortController();
   private controller = new AbortController();
   private nextTickAt = 0;
   private failure: Extract<RunMessage, { type: "recording.error" }> | null =
@@ -94,7 +96,13 @@ export class Runs {
         "command_conflict",
         "This command ID was already used for a different request.",
       );
-    return this.recordings.get(command.resultRunId ?? command.runId)!;
+    const recording = this.recordings.get(command.resultRunId ?? command.runId);
+    if (!recording)
+      throw new RunError(
+        "invalid_transition",
+        "This command's recording was deleted. Use a new command ID to start another run.",
+      );
+    return recording;
   }
 
   private prepare(input: StartRun) {
@@ -184,6 +192,11 @@ export class Runs {
     const source = this.recordings.get(runId);
     if (!source)
       throw new RunError("invalid_transition", "This recording was not found.");
+    if (source.run.status === "running")
+      throw new RunError(
+        "invalid_transition",
+        "Wait for the source run to finish before creating a linked recording.",
+      );
     const result = recreateTelemetry(source);
     if (result.status === "incompatible")
       return runOperationResultSchema.parse(result);
@@ -195,9 +208,26 @@ export class Runs {
   }
 
   async reevaluate(runId: string) {
+    const release = this.recordings.storage.retain(runId);
+    const operation = this.reevaluateSource(runId);
+    this.reevaluations.add(operation);
+    try {
+      return await operation;
+    } finally {
+      release();
+      this.reevaluations.delete(operation);
+    }
+  }
+
+  private async reevaluateSource(runId: string) {
     const source = this.recordings.get(runId);
     if (!source)
       throw new RunError("invalid_transition", "This recording was not found.");
+    if (source.run.status === "running")
+      throw new RunError(
+        "invalid_transition",
+        "Wait for the source run to finish before creating a linked recording.",
+      );
     if (source.run.manifest.schemaVersion !== 2)
       return runOperationResultSchema.parse({
         status: "incompatible",
@@ -245,7 +275,12 @@ export class Runs {
                 },
           );
         },
-        new AbortController().signal,
+        this.reevaluationController.signal,
+      );
+    if (this.reevaluationController.signal.aborted)
+      throw new RunError(
+        "invalid_transition",
+        "Fresh evaluation was interrupted by backend shutdown. The source recording is retained; retry after restart.",
       );
     const orderedAttempts = [...attempts.values()].sort(
       (a, b) =>
@@ -854,6 +889,8 @@ export class Runs {
   }
   async close() {
     this.controller.abort();
+    this.reevaluationController.abort();
+    await Promise.allSettled(this.reevaluations);
     await Promise.all(this.outstanding);
     this.interrupt();
   }

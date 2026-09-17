@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { RecordingStorage } from "./recording-storage.js";
 import {
   recordingSchema,
   investigationEventSchema,
@@ -29,7 +30,10 @@ function readJson(row: unknown): unknown {
 }
 
 export class Recordings {
-  constructor(private readonly database: Database.Database) {}
+  readonly storage: RecordingStorage;
+  constructor(private readonly database: Database.Database) {
+    this.storage = new RecordingStorage(database);
+  }
 
   transaction<T>(operation: () => T): T {
     return this.database.transaction(operation)();
@@ -87,6 +91,7 @@ export class Recordings {
           ...run,
           seed: manifest.seed,
           durationSeconds: manifest.durationSeconds,
+          storage: this.storage.describe(run.id),
         };
       }),
       total,
@@ -101,8 +106,18 @@ export class Recordings {
       .get(id);
     if (!row) return null;
     const run = runSchema.parse(readJson(row));
-    const evidenceRunId =
-      run.derivation?.type === "reevaluation" ? run.derivation.sourceRunId : id;
+    let evidenceRunId = id;
+    let owner = run;
+    const visited = new Set([id]);
+    while (owner.derivation?.type === "reevaluation") {
+      evidenceRunId = owner.derivation.sourceRunId;
+      if (visited.has(evidenceRunId))
+        throw new Error("Cyclic recording evidence");
+      visited.add(evidenceRunId);
+      const source = this.run(evidenceRunId);
+      if (!source) throw new Error("Recording evidence is missing");
+      owner = source;
+    }
     return recordingSchema.parse({
       run,
       attempts: this.attempts(id),

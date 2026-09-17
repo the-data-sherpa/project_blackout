@@ -18,6 +18,7 @@ import {
 } from "@blackout/contracts";
 import { openDatabase } from "./database.js";
 import { Recordings } from "./recordings.js";
+import { RecordingInUse } from "./recording-storage.js";
 import { RunError, Runs } from "./runs.js";
 import type { EvaluatorOptions } from "./evaluator.js";
 import { defaultEvaluation } from "./evaluator.js";
@@ -70,6 +71,13 @@ export async function buildApp(options: AppOptions) {
     await app.register(websocket, { options: { maxPayload: 16 * 1024 } });
 
     app.setErrorHandler((error, _request, reply) => {
+      if (error instanceof RecordingInUse)
+        return reply.code(409).send(
+          apiErrorSchema.parse({
+            code: "recording_in_use",
+            message: error.message,
+          }),
+        );
       if (
         error instanceof Error &&
         "statusCode" in error &&
@@ -172,7 +180,13 @@ export async function buildApp(options: AppOptions) {
     });
 
     app.get("/api/evaluation-reports", async () => ({
-      reports: service.recordings.reports(),
+      reports: service.recordings.reports().map((report) => ({
+        ...report,
+        runs: report.runs.map((run) => ({
+          ...run,
+          recordingAvailable: service.recordings.run(run.runId) !== null,
+        })),
+      })),
     }));
     app.post("/api/evaluation-reports", async (request, reply) => {
       const { runIds } = parseInput(
@@ -222,6 +236,17 @@ export async function buildApp(options: AppOptions) {
     app.get("/api/runs", async (request) => {
       const { offset, limit } = parseInput(runListQuerySchema, request.query);
       return service.recordings.list(offset, limit);
+    });
+
+    app.get("/api/storage", async () => service.recordings.storage.usage());
+    app.delete("/api/runs/:id", async (request, reply) => {
+      const { id } = parseInput(
+        z.strictObject({ id: runIdSchema }),
+        request.params,
+      );
+      // Idempotent: a retry after a lost response confirms the run is absent.
+      service.recordings.storage.delete(id);
+      return reply.code(204).send();
     });
 
     app.get("/api/runs/active", async () =>

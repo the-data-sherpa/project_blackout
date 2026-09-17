@@ -15,6 +15,7 @@ export const evaluationReportSchema = z.strictObject({
   runs: z.array(
     z.strictObject({
       runId: z.uuid(),
+      recordingAvailable: z.boolean().optional(),
       seed: z.string(),
       fixture: fixtureSchema,
       questionVersion: z.string(),

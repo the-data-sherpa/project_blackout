@@ -33,9 +33,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker compose up --build --wait
-      - run: curl --fail http://localhost:3001/api/health && curl --fail http://localhost:3000/ --output /dev/null
-      - run: docker compose logs
-        if: failure()
-      - run: docker compose down
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:release
+      - uses: actions/upload-artifact@v4
         if: always()
+        with:
+          name: release-verification
+          path: test-results/
+          if-no-files-found: ignore

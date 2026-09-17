@@ -5,9 +5,9 @@ services:
       target: server
     init: true
     ports:
-      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:${BLACKOUT_API_PORT:-3001}:3001"
     environment:
-      WEB_ORIGIN: http://localhost:3000
+      WEB_ORIGIN: http://localhost:${BLACKOUT_WEB_PORT:-3000}
       API_PORT: "3001"
       LOG_LEVEL: info
       JEV_API_KEY: ${JEV_API_KEY:-}
@@ -36,9 +36,9 @@ services:
       target: web
     init: true
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${BLACKOUT_WEB_PORT:-3000}:3000"
     environment:
-      PUBLIC_BACKEND_URL: http://localhost:3001
+      PUBLIC_BACKEND_URL: http://localhost:${BLACKOUT_API_PORT:-3001}
     depends_on:
       server:
         condition: service_healthy

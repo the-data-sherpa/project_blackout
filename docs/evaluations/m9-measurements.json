@@ -1,0 +1,63 @@
+{
+  "recordedAt": "2026-09-17T20:31:23.464Z",
+  "reportId": "d2f73a4f-58ee-4082-8eb5-eb91c5302532",
+  "latencyMs": {
+    "samples": 180,
+    "p50": 224.071324499997,
+    "p95": 399.2283729999908
+  },
+  "actualSpeed": {
+    "min": 3.6617329633055813,
+    "max": 3.852080123266564
+  },
+  "httpTimingMs": {
+    "/api/storage": [85.8, 85, 86.1, 83.8, 92],
+    "/api/runs?limit=20": [71.4, 70.9, 70.3, 69.9, 68.8]
+  },
+  "storedRuns": 51,
+  "storage": {
+    "databaseBytes": 298147840,
+    "reusableBytes": 0,
+    "walBytes": 6369552,
+    "recordingBytes": 260507444,
+    "reportBytes": 246096
+  },
+  "suiteStorage": [
+    {
+      "id": "36ce0742-76f6-4a80-80d2-55665e9172cf",
+      "bytes": 6967581
+    },
+    {
+      "id": "0a3ee8b2-da50-4b60-b65c-4e3d6332be24",
+      "bytes": 7309878
+    },
+    {
+      "id": "0b45553c-89cf-4a78-89b9-096ce23bed94",
+      "bytes": 6730362
+    },
+    {
+      "id": "ddd33ff8-96b6-42b4-baf1-34e9e16f1f11",
+      "bytes": 7045444
+    },
+    {
+      "id": "acee674f-5073-4cec-a1ca-382107506df7",
+      "bytes": 7373201
+    },
+    {
+      "id": "c9d6b537-3fb3-4097-ab65-1f42063984f0",
+      "bytes": 6801476
+    },
+    {
+      "id": "4842c469-3bf1-4e87-b4ed-85a3fb1690bb",
+      "bytes": 7032866
+    },
+    {
+      "id": "2e67bf4e-85ee-4f08-8bb5-8e695a5251e3",
+      "bytes": 7369458
+    },
+    {
+      "id": "b23a233a-daa1-4c71-bba6-31932134806b",
+      "bytes": 6757169
+    }
+  ]
+}

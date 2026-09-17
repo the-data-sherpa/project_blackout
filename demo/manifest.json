@@ -1,0 +1,42 @@
+{
+  "format": "blackout-demo/1",
+  "createdAt": "2026-09-17T20:27:58.334Z",
+  "runId": "2e67bf4e-85ee-4f08-8bb5-8e695a5251e3",
+  "runIds": [
+    "b23a233a-daa1-4c71-bba6-31932134806b",
+    "2e67bf4e-85ee-4f08-8bb5-8e695a5251e3",
+    "4842c469-3bf1-4e87-b4ed-85a3fb1690bb"
+  ],
+  "sha256": "cc414d84b7774a67067a9157eeb1f83a34f49d91d34b7e90003b360ec58aa8ca",
+  "compressedBytes": 3623704,
+  "storage": {
+    "databaseBytes": 23695360,
+    "reusableBytes": 0,
+    "walBytes": 0,
+    "recordingBytes": 21159493,
+    "reportBytes": 23263
+  },
+  "runs": [
+    {
+      "id": "b23a233a-daa1-4c71-bba6-31932134806b",
+      "seed": "m4-001",
+      "fixture": "baseline",
+      "model": "jev-1.13.0",
+      "durationMs": 95000
+    },
+    {
+      "id": "2e67bf4e-85ee-4f08-8bb5-8e695a5251e3",
+      "seed": "m4-001",
+      "fixture": "credential-compromise",
+      "model": "jev-1.13.0",
+      "durationMs": 95000
+    },
+    {
+      "id": "4842c469-3bf1-4e87-b4ed-85a3fb1690bb",
+      "seed": "m4-001",
+      "fixture": "benign-maintenance",
+      "model": "jev-1.13.0",
+      "durationMs": 95000
+    }
+  ]
+}

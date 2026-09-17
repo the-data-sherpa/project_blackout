@@ -42,6 +42,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
   const [stream, setStream] = useState("Not connected");
   const [attempt, setAttempt] = useState(0);
   const [setupAttempt, setSetupAttempt] = useState(0);
+  const [deletionRevision, setDeletionRevision] = useState(0);
   const [operation, setOperation] = useState<"rerun" | "reevaluation" | null>(
     null,
   );
@@ -342,8 +343,23 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
         refreshKey={`${run?.id ?? ""}:${run?.status ?? ""}`}
         onSelect={selectRun}
         onActiveRun={setActiveRunId}
+        onDeleted={(id) => {
+          setDeletionRevision((value) => value + 1);
+          setRunId((current) => (current === id ? null : current));
+          setRecording((current) => (current?.run.id === id ? null : current));
+          const url = new URL(window.location.href);
+          if (url.searchParams.get("run") !== id) return;
+          setError(null);
+          url.searchParams.delete("run");
+          url.searchParams.delete("decision");
+          url.searchParams.delete("time");
+          window.history.replaceState(null, "", url);
+        }}
       />
-      <EvaluationReports backendUrl={backendUrl} />
+      <EvaluationReports
+        backendUrl={backendUrl}
+        refreshKey={deletionRevision}
+      />
       {error && (
         <div
           role="alert"

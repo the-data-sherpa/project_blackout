@@ -40,6 +40,8 @@ COPY --from=server-build /app/apps/server/package.json ./apps/server/package.jso
 COPY --from=server-build /app/apps/server/dist ./apps/server/dist
 COPY --from=server-build /app/packages/contracts/package.json ./packages/contracts/package.json
 COPY --from=server-build /app/packages/contracts/dist ./packages/contracts/dist
+COPY scripts/install-demo.mjs ./scripts/install-demo.mjs
+COPY demo ./demo
 RUN mkdir /app/data && chown node:node /app/data
 USER node
 EXPOSE 3001

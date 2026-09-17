@@ -1,0 +1,353 @@
+{
+  "schemaVersion": "m9-reevaluation-sample/1",
+  "recordedAt": "2026-09-17T20:31:03.095Z",
+  "sourceRunId": "2e67bf4e-85ee-4f08-8bb5-8e695a5251e3",
+  "reevaluationRunId": "365842cb-26d2-4d3b-bedd-d768ec58865c",
+  "sourceUnchanged": true,
+  "evidenceUnchanged": true,
+  "model": "jev-1.13.0",
+  "attempts": 20,
+  "successfulAttempts": 20,
+  "checkpoints": [
+    {
+      "simulationTimeMs": 0,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.19,
+        "classification": "normal",
+        "policyOutcome": "observe",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.17,
+        "classification": "normal",
+        "policyOutcome": "observe",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 5000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.67,
+        "classification": "suspicious",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.66,
+        "classification": "suspicious",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 10000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.83,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.83,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 15000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.8,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.8,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 20000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.83,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.83,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 25000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.83,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.81,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 30000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.84,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.87,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 35000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.85,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.85,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 40000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.85,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.84,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 45000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.78,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.77,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 50000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.8,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.79,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 55000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.71,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.74,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 60000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.76,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.77,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 65000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.36,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.36,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 70000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.39,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.36,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 75000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.48,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.46,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 80000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.44,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.45,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 85000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.39,
+        "classification": "suspicious",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.43,
+        "classification": "suspicious",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 90000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.4,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.37,
+        "classification": "suspicious",
+        "policyOutcome": "review",
+        "error": null
+      }
+    },
+    {
+      "simulationTimeMs": 95000,
+      "source": {
+        "status": "succeeded",
+        "compromiseProbability": 0.43,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      },
+      "reevaluation": {
+        "status": "succeeded",
+        "compromiseProbability": 0.45,
+        "classification": "compromise",
+        "policyOutcome": "review",
+        "error": null
+      }
+    }
+  ]
+}

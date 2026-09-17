@@ -6,7 +6,13 @@ import {
   type EvaluationReport,
 } from "@blackout/contracts";
 
-export function EvaluationReports({ backendUrl }: { backendUrl: string }) {
+export function EvaluationReports({
+  backendUrl,
+  refreshKey = 0,
+}: {
+  backendUrl: string;
+  refreshKey?: number;
+}) {
   const [reports, setReports] = useState<EvaluationReport[]>([]);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -38,7 +44,7 @@ export function EvaluationReports({ backendUrl }: { backendUrl: string }) {
     }
     void load();
     return () => controller.abort();
-  }, [backendUrl, refresh]);
+  }, [backendUrl, refresh, refreshKey]);
   return (
     <details className="min-w-0 rounded-lg border border-slate-700 p-5">
       <summary className="cursor-pointer font-medium">
@@ -99,11 +105,24 @@ export function EvaluationReports({ backendUrl }: { backendUrl: string }) {
                   <tr key={run.runId} className="border-t border-slate-700">
                     <td className="p-2">
                       <a
-                        className="text-emerald-300 underline"
-                        href={`/?run=${run.runId}`}
+                        className={
+                          run.recordingAvailable === false
+                            ? "text-slate-300"
+                            : "text-emerald-300 underline"
+                        }
+                        href={
+                          run.recordingAvailable === false
+                            ? undefined
+                            : `/?run=${run.runId}`
+                        }
                       >
                         {run.fixture} · {run.seed}
                       </a>
+                      {run.recordingAvailable === false && (
+                        <span className="block text-amber-200">
+                          Recording deleted; measured results retained.
+                        </span>
+                      )}
                     </td>
                     <td className="p-2">
                       {run.attackOutcome === "not_applicable"
@@ -192,8 +211,16 @@ export function EvaluationReports({ backendUrl }: { backendUrl: string }) {
                 {run.decisions.map((decision) => (
                   <li key={decision.attemptId}>
                     <a
-                      className="text-emerald-300 underline"
-                      href={`/?run=${run.runId}&decision=${decision.attemptId}#decision-title`}
+                      className={
+                        run.recordingAvailable === false
+                          ? "text-slate-300"
+                          : "text-emerald-300 underline"
+                      }
+                      href={
+                        run.recordingAvailable === false
+                          ? undefined
+                          : `/?run=${run.runId}&decision=${decision.attemptId}#decision-title`
+                      }
                     >
                       {decision.simulationTimeMs / 1000}s · {decision.status} ·{" "}
                       {decision.classification ?? decision.error} ·{" "}

@@ -4,8 +4,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import { evaluationReportSchema, recordingSchema } from "@blackout/contracts";
 
 const flags = process.argv.slice(2);
-if (flags.some((flag) => !["--smoke", "--m4"].includes(flag)))
-  throw new Error("Usage: npm run evaluate [-- --m4] [--smoke]");
+if (flags.some((flag) => !["--smoke", "--m4", "--speed=5"].includes(flag)))
+  throw new Error("Usage: npm run evaluate [-- --m4] [--smoke] [--speed=5]");
 const base = process.env.BLACKOUT_API_URL ?? "http://localhost:3001";
 async function api(path, body) {
   const response = await fetch(new URL(path, base), {
@@ -70,6 +70,15 @@ for (const seed of seeds) {
     const id = recording.run.id;
     runIds.push(id);
     console.log(`${fixture} ${seed}: ${id}`);
+    if (flags.includes("--speed=5")) {
+      recording = recordingSchema.parse(
+        await api(`/api/runs/${id}/commands`, {
+          commandId: crypto.randomUUID(),
+          type: "set-speed",
+          speed: 5,
+        }),
+      );
+    }
     const budgetMs =
       durationSeconds * 1000 +
       checkpoints *

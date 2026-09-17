@@ -192,6 +192,20 @@ export const runListQuerySchema = z.strictObject({
 export const runSummarySchema = runSchema.omit({ manifest: true }).extend({
   seed: startRunSchema.shape.seed,
   durationSeconds: startRunSchema.shape.durationSeconds,
+  storage: z
+    .strictObject({
+      ownedBytes: z.number().int().nonnegative(),
+      sharedSourceRunId: runIdSchema.nullable(),
+      deletionBlockers: z.array(z.string()),
+    })
+    .optional(),
+});
+export const storageUsageSchema = z.strictObject({
+  databaseBytes: z.number().int().nonnegative(),
+  reusableBytes: z.number().int().nonnegative(),
+  walBytes: z.number().int().nonnegative(),
+  recordingBytes: z.number().int().nonnegative(),
+  reportBytes: z.number().int().nonnegative(),
 });
 export const runListSchema = z.strictObject({
   runs: z.array(runSummarySchema),
@@ -274,6 +288,7 @@ export const apiErrorSchema = z.strictObject({
     "recording_unavailable",
     "invalid_transition",
     "command_conflict",
+    "recording_in_use",
   ]),
   message: z.string(),
 });
