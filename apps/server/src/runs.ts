@@ -4,8 +4,17 @@ import {
   startRunSchema,
   type Run,
   type RunMessage,
+  type TelemetryEvent,
 } from "@blackout/contracts";
-import { authenticationStep, createManifest } from "./authentication.js";
+import {
+  baselineObservations,
+  createTelemetryManifest,
+  generateWarmup,
+  observe,
+  orderObservations,
+} from "./telemetry.js";
+import { fixtureObservations } from "./fixtures.js";
+import { createSnapshot } from "./aggregation.js";
 import { Recordings } from "./recordings.js";
 
 export class RunError extends Error {
@@ -19,6 +28,7 @@ export class RunError extends Error {
 
 export class Runs {
   private current: Run | null = null;
+  private evidence: TelemetryEvent[] = [];
   private readonly listeners = new Set<(message: RunMessage) => void>();
   private failure: Extract<RunMessage, { type: "recording.error" }> | null =
     null;
@@ -48,22 +58,33 @@ export class Runs {
         "run_active",
         "A run is already active. Wait for it to finish.",
       );
+    const manifest = createTelemetryManifest(parsed);
     const run: Run = {
       id: randomUUID(),
-      manifest: createManifest(parsed),
+      manifest,
       status: "running",
       simulationTimeMs: 0,
       lastSequence: 0,
       createdAt: new Date().toISOString(),
       endedAt: null,
     };
-    this.recordings.create(run, {
-      runId: run.id,
-      type: "start",
-      sequence: 1,
-      simulationTimeMs: 0,
-      recordedAt: run.createdAt,
-    });
+    const events = generateWarmup(manifest, run.id);
+    run.lastSequence = events.at(-1)!.sequence;
+    const snapshot = createSnapshot(run.id, manifest.organization, events, 0);
+    this.recordings.create(
+      run,
+      {
+        runId: run.id,
+        type: "start",
+        sequence: 1,
+        simulationTimeMs: 0,
+        recordedAt: run.createdAt,
+        parameters: { fixture: manifest.fixture },
+      },
+      events,
+      snapshot,
+    );
+    this.evidence = events;
     this.current = run;
     return this.recordings.get(run.id)!;
   }
@@ -75,7 +96,43 @@ export class Runs {
     let message: RunMessage;
     try {
       const simulationTimeMs = run.simulationTimeMs + run.manifest.tickMs;
-      const events = authenticationStep(run.manifest, run.id, simulationTimeMs);
+      const manifest = run.manifest;
+      if (manifest.schemaVersion !== 2)
+        throw new Error("Legacy runs cannot resume generation");
+      const fixture = fixtureObservations(manifest, simulationTimeMs);
+      const observations = orderObservations(manifest, simulationTimeMs, [
+        ...baselineObservations(manifest, simulationTimeMs),
+        ...fixture.observations,
+      ]);
+      const events = observations.map((observation, index) =>
+        observe(
+          observation,
+          manifest,
+          run.id,
+          simulationTimeMs,
+          run.lastSequence + index + 1,
+        ),
+      );
+      const evidence = [...this.evidence, ...events].filter(
+        (event) =>
+          event.simulationTimeMs > simulationTimeMs - manifest.warmupMs,
+      );
+      const snapshot = createSnapshot(
+        run.id,
+        manifest.organization,
+        evidence,
+        simulationTimeMs,
+      );
+      const injected = new Set(fixture.observations);
+      const truth = fixture.truth
+        ? {
+            ...fixture.truth,
+            runId: run.id,
+            eventSequences: events
+              .filter((_event, index) => injected.has(observations[index]!))
+              .map((event) => event.sequence),
+          }
+        : undefined;
       const complete = simulationTimeMs === run.manifest.durationSeconds * 1000;
       const updated: Run = {
         ...run,
@@ -88,8 +145,10 @@ export class Runs {
         type: "run.updated",
         run: updated,
         events,
+        snapshot,
       });
-      this.recordings.commit(updated, events);
+      this.recordings.commit(updated, events, snapshot, truth);
+      this.evidence = complete ? [] : evidence;
       this.current = complete ? null : updated;
     } catch {
       this.current = null;

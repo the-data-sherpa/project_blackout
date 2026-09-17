@@ -47,7 +47,7 @@ it("starts, commits and inspects a complete ordered run through HTTP and WebSock
   expect(started.run.status).toBe("running");
   expect(started.run.manifest).toMatchObject({
     seed: "demo",
-    schemaVersion: 1,
+    schemaVersion: 2,
     policyVersion: null,
     evaluatorVersion: null,
     requestedModel: null,
@@ -60,9 +60,14 @@ it("starts, commits and inspects a complete ordered run through HTTP and WebSock
       sequence: 1,
       simulationTimeMs: 0,
       recordedAt: started.run.createdAt,
+      parameters: { fixture: "baseline" },
     },
   ]);
-  expect(started.events).toEqual([]);
+  expect(started.events).toHaveLength(4500);
+  expect(started.events.every((event) => event.simulationTimeMs < 0)).toBe(
+    true,
+  );
+  expect(started.snapshots).toHaveLength(1);
   const messages: ServerMessage[] = [];
   const socket = await app.injectWS(
     `/ws?runId=${started.run.id}`,
@@ -87,25 +92,31 @@ it("starts, commits and inspects a complete ordered run through HTTP and WebSock
   expect(saved.run).toMatchObject({
     status: "completed",
     simulationTimeMs: 2000,
-    lastSequence: 4,
+    lastSequence: 4510,
   });
   expect(saved.run.endedAt).not.toBeNull();
   expect(
-    saved.events.map(({ sequence, simulationTimeMs }) => [
-      sequence,
-      simulationTimeMs,
-    ]),
+    saved.events
+      .filter((event) => event.simulationTimeMs > 0)
+      .map(({ sequence, simulationTimeMs }) => [sequence, simulationTimeMs]),
   ).toEqual([
-    [1, 1000],
-    [2, 1000],
-    [3, 2000],
-    [4, 2000],
+    [4501, 1000],
+    [4502, 1000],
+    [4503, 1000],
+    [4504, 1000],
+    [4505, 1000],
+    [4506, 2000],
+    [4507, 2000],
+    [4508, 2000],
+    [4509, 2000],
+    [4510, 2000],
   ]);
   await expect.poll(() => messages.length).toBe(4);
   expect(messages[3]).toEqual({
     type: "run.updated",
     run: saved.run,
-    events: saved.events.slice(2),
+    events: saved.events.slice(-5),
+    snapshot: saved.snapshots.at(-1),
   });
   expect((await app.inject("/api/runs/active")).json()).toEqual({
     runId: null,
@@ -235,7 +246,7 @@ it("publishes only committed records, and preserves them across reopen", () => {
   const reopened = openDatabase(path);
   try {
     expect(new Recordings(reopened).get(started.run.id)).toEqual(expected);
-    expect(reopened.pragma("user_version", { simple: true })).toBe(1);
+    expect(reopened.pragma("user_version", { simple: true })).toBe(2);
     expect(reopened.pragma("synchronous", { simple: true })).toBe(2);
   } finally {
     reopened.close();
@@ -258,7 +269,7 @@ it("rolls back a failed start and a partial step without publishing unsaved even
   const started = runs.start({ seed: "failure", durationSeconds: 3 });
   runs.tick();
   database.exec(
-    "CREATE TRIGGER fail_step BEFORE INSERT ON events WHEN NEW.sequence = 4 BEGIN SELECT RAISE(ABORT, 'write failure'); END;",
+    "CREATE TRIGGER fail_step BEFORE INSERT ON events WHEN NEW.sequence = 4510 BEGIN SELECT RAISE(ABORT, 'write failure'); END;",
   );
   runs.tick();
   runs.tick();
@@ -266,15 +277,16 @@ it("rolls back a failed start and a partial step without publishing unsaved even
   expect(saved.run).toMatchObject({
     status: "failed",
     simulationTimeMs: 1000,
-    lastSequence: 2,
+    lastSequence: 4505,
   });
-  expect(saved.events.map((event) => event.sequence)).toEqual([1, 2]);
+  expect(saved.events).toHaveLength(4505);
+  expect(saved.snapshots).toHaveLength(2);
   expect(messages.at(-1)?.type).toBe("recording.error");
   expect(
     messages
       .filter((message) => message.type === "run.updated")
       .flatMap((message) => message.events),
-  ).toEqual(saved.events);
+  ).toEqual(saved.events.filter((event) => event.simulationTimeMs > 0));
   expect(() => runs.start({ seed: "next" })).toThrow("Recording failed");
 });
 
@@ -290,7 +302,7 @@ it("marks unfinished runs interrupted before accepting a new run", () => {
     expect(after.recordings.get(started.run.id)?.run).toMatchObject({
       status: "interrupted",
       simulationTimeMs: 1000,
-      lastSequence: 2,
+      lastSequence: 4505,
     });
     expect(after.start({ seed: "next" }).run.id).not.toBe(started.run.id);
   } finally {
@@ -309,7 +321,7 @@ it("does not rewind a committed step when a transport subscriber throws", () => 
   expect(recordings.get(started.run.id)?.run).toMatchObject({
     status: "running",
     simulationTimeMs: 1000,
-    lastSequence: 2,
+    lastSequence: 4505,
   });
   expect(runs.recordingFailure).toBeNull();
   unsubscribe();
@@ -317,7 +329,7 @@ it("does not rewind a committed step when a transport subscriber throws", () => 
   expect(recordings.get(started.run.id)?.run).toMatchObject({
     status: "completed",
     simulationTimeMs: 2000,
-    lastSequence: 4,
+    lastSequence: 4510,
   });
 });
 
@@ -464,9 +476,9 @@ it("reports a storage failure even when it cannot persist failed status", async 
     expect(saved.run).toMatchObject({
       status: "running",
       simulationTimeMs: 1000,
-      lastSequence: 2,
+      lastSequence: 4505,
     });
-    expect(saved.events).toHaveLength(2);
+    expect(saved.events).toHaveLength(4505);
     expect(
       messages.filter((message) => message.type === "run.updated"),
     ).toEqual([]);
@@ -513,4 +525,50 @@ it("classifies invalid saved data as a recording failure rather than bad request
   const response = await app.inject(`/api/runs/${started.run.id}`);
   expect(response.statusCode).toBe(503);
   expect(response.json().code).toBe("recording_unavailable");
+});
+
+it("serves truth only from its explicit endpoint and retains evidence for every saved aggregate", async () => {
+  const { app, tick } = await createApp();
+  const started = recordingSchema.parse(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/runs",
+        payload: {
+          seed: "separate-truth",
+          durationSeconds: 2,
+          fixture: "credential-attack",
+        },
+      })
+    ).json(),
+  );
+  tick();
+  tick();
+  const saved = recordingSchema.parse(
+    (await app.inject(`/api/runs/${started.run.id}`)).json(),
+  );
+  const truth = (await app.inject(`/api/runs/${started.run.id}/truth`)).json();
+  expect(truth.records).toHaveLength(2);
+  expect(JSON.stringify(saved)).not.toContain("credential-misuse");
+  expect(saved.snapshots).toHaveLength(3);
+  const events = new Map(saved.events.map((event) => [event.sequence, event]));
+  for (const snapshot of saved.snapshots) {
+    for (const window of snapshot.input.windows) {
+      for (const metric of window.metrics) {
+        for (const sequence of metric.evidenceSequences) {
+          const event = events.get(sequence)!;
+          expect(event).toBeDefined();
+          expect(event.simulationTimeMs).toBeGreaterThan(
+            window.startExclusiveMs,
+          );
+          expect(event.simulationTimeMs).toBeLessThanOrEqual(
+            window.endInclusiveMs,
+          );
+        }
+      }
+    }
+  }
+  expect((await app.inject(`/api/runs/${randomUUID()}/truth`)).statusCode).toBe(
+    404,
+  );
 });

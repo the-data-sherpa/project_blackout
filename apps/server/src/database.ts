@@ -22,11 +22,12 @@ export function openDatabase(filename: string) {
 
 function migrate(database: Database.Database) {
   const version = database.pragma("user_version", { simple: true });
-  if (version === 1) return;
-  if (version !== 0)
+  if (version === 2) return;
+  if (version !== 0 && version !== 1)
     throw new Error(`Unsupported database version: ${String(version)}`);
-  database.transaction(() => {
-    database.exec(`
+  if (version === 0)
+    database.transaction(() => {
+      database.exec(`
       CREATE TABLE runs (
         id TEXT PRIMARY KEY,
         status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'interrupted', 'failed')),
@@ -46,6 +47,25 @@ function migrate(database: Database.Database) {
         PRIMARY KEY (run_id, sequence)
       );
       PRAGMA user_version = 1;
+    `);
+    })();
+  database.transaction(() => {
+    database.exec(`
+      CREATE TABLE snapshots (
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        id TEXT NOT NULL,
+        simulation_time_ms INTEGER NOT NULL,
+        record TEXT NOT NULL,
+        PRIMARY KEY (run_id, id),
+        UNIQUE (run_id, simulation_time_ms)
+      );
+      CREATE TABLE scenario_truth (
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        simulation_time_ms INTEGER NOT NULL,
+        record TEXT NOT NULL,
+        PRIMARY KEY (run_id, simulation_time_ms)
+      );
+      PRAGMA user_version = 2;
     `);
   })();
 }

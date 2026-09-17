@@ -7,7 +7,7 @@ The ticket bodies contain acceptance criteria and blocking references. Native Gi
 
 ## Working order
 
-Start with [#1 — Start and inspect a recorded seeded run](https://github.com/the-data-sherpa/project_blackout/issues/1).
+M1 and M2 are implemented. Continue with [#7 — Inspect one real Jev evaluation](https://github.com/the-data-sherpa/project_blackout/issues/7).
 Work any ticket whose blocking issues are all complete. A readiness label describes specification readiness; dependencies determine when work can start.
 Milestones are completion checkpoints rather than blanket barriers to independent tickets. All tickets and their acceptance criteria are required for full MVP delivery.
 

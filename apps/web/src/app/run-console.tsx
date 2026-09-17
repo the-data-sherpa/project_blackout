@@ -3,6 +3,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
   activeRunSchema,
+  fixtureSchema,
+  type Fixture,
   apiErrorSchema,
   recordingSchema,
   runIdSchema,
@@ -11,6 +13,7 @@ import {
   type Recording,
 } from "@blackout/contracts";
 import { RunBrowser } from "./run-browser";
+import { TelemetryInspector } from "./telemetry-inspector";
 
 const buttonClass =
   "min-h-11 rounded border border-slate-500 px-4 py-2 text-sm hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-60";
@@ -22,6 +25,7 @@ const statusLabels = {
 };
 
 export function RunConsole({ backendUrl }: { backendUrl: string }) {
+  const [fixture, setFixture] = useState<Fixture>("baseline");
   const [seed, setSeed] = useState("blackout-demo-001");
   const [duration, setDuration] = useState("30");
   const [runId, setRunId] = useState<string | null>(null);
@@ -138,6 +142,13 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               return {
                 ...previous,
                 run: next,
+                snapshots:
+                  message.snapshot &&
+                  !previous.snapshots.some(
+                    (snapshot) => snapshot.id === message.snapshot!.id,
+                  )
+                    ? [...previous.snapshots, message.snapshot]
+                    : previous.snapshots,
                 events: [
                   ...previous.events,
                   ...message.events.filter(
@@ -183,6 +194,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
     const input = startRunSchema.safeParse({
       seed,
       durationSeconds: Number(duration),
+      fixture,
     });
     if (!input.success) {
       setError(
@@ -234,7 +246,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
     <section className="min-w-0 space-y-6 py-8" aria-labelledby="runs-title">
       <div>
         <p className="font-mono text-xs uppercase tracking-widest text-emerald-300">
-          Seeded authentication
+          Observable telemetry
         </p>
         <h1
           id="runs-title"
@@ -243,8 +255,9 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
           Start a recorded run.
         </h1>
         <p className="mt-3 max-w-2xl leading-relaxed text-slate-300">
-          Watch synthetic sign-ins, then inspect the saved events. The same seed
-          and duration produce the same stream. No Jev calls are made.
+          Inspect a synthetic organization, watch its telemetry and trace
+          rolling state to recorded evidence. The same versioned inputs
+          reproduce the stream. No Jev calls are made.
         </p>
       </div>
       <form
@@ -289,6 +302,21 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
             {loading ? "Loading…" : "Start run"}
           </button>
         </div>
+        <label className="mt-4 block text-sm text-slate-300">
+          Comparison fixture
+          <select
+            className="mt-2 block min-h-11 w-full rounded border border-slate-500 bg-slate-950 px-3 text-slate-100"
+            name="fixture"
+            value={fixture}
+            onChange={(event) =>
+              setFixture(fixtureSchema.parse(event.target.value))
+            }
+          >
+            <option value="baseline">Baseline only</option>
+            <option value="credential-attack">Minimal credential attack</option>
+            <option value="harmless-anomaly">Harmless anomaly</option>
+          </select>
+        </label>
         <p className="mt-3 text-sm text-slate-400">
           One active run at a time. Each run ends at its chosen duration.
         </p>
@@ -444,84 +472,11 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               )}
             </pre>
           </details>
-          <h3 className="mb-3 font-medium">Authentication events</h3>
-          <p className="mb-4 text-sm text-slate-400">
-            Oldest first. Events at the same simulation time are ordered by
-            sequence.
-          </p>
-          <div
-            className="max-h-[32rem] overflow-auto rounded border border-slate-700"
-            tabIndex={0}
-            role="region"
-            aria-label="Recorded authentication events"
-          >
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">
-                Recorded authentication events in sequence order
-              </caption>
-              <thead className="sticky top-0 bg-slate-900 text-xs text-slate-300">
-                <tr>
-                  {[
-                    "Sequence / time",
-                    "Identity / host",
-                    "Resource / source IP",
-                    "Outcome",
-                  ].map((title) => (
-                    <th
-                      key={title}
-                      scope="col"
-                      className="px-4 py-3 font-medium"
-                    >
-                      {title}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {recording.events.map((item) => (
-                  <tr
-                    key={item.sequence}
-                    className="border-t border-slate-800"
-                    data-testid="event-row"
-                  >
-                    <td className="px-4 py-3 font-mono text-xs">
-                      <span className="block">#{item.sequence}</span>
-                      <time
-                        dateTime={item.occurredAt}
-                        title={item.occurredAt}
-                        className="mt-1 block text-slate-400"
-                      >
-                        {(item.simulationTimeMs / 1000).toFixed(1)} s
-                      </time>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs">
-                      <span className="block">{item.userId}</span>
-                      <span className="mt-1 block text-slate-400">
-                        {item.hostId}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      <span className="block">{item.resource}</span>
-                      <span className="mt-1 block font-mono text-slate-400">
-                        {item.sourceIp}
-                      </span>
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-xs ${item.outcome === "failure" ? "text-amber-200" : "text-slate-200"}`}
-                    >
-                      {item.outcome === "success" ? "Success" : "Failure"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {recording.events.length === 0 && (
-              <p className="p-5 text-sm text-slate-400">
-                No events saved yet. The first step arrives at 1 simulation
-                second.
-              </p>
-            )}
-          </div>
+          <TelemetryInspector
+            key={run.id}
+            recording={recording}
+            backendUrl={backendUrl}
+          />
         </section>
       )}
     </section>

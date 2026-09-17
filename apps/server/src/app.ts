@@ -69,7 +69,7 @@ export async function buildApp(options: AppOptions) {
           apiErrorSchema.parse({
             code: "invalid_input",
             message:
-              "Use a seed of 1–128 characters, a duration of 1–120 whole seconds, and a valid run ID.",
+              "Use a seed of 1–128 characters, a duration of 1–120 whole seconds, a supported comparison fixture, and a valid run ID.",
           }),
         );
       }
@@ -118,6 +118,21 @@ export async function buildApp(options: AppOptions) {
           }),
         );
       return recording;
+    });
+
+    app.get("/api/runs/:id/truth", async (request, reply) => {
+      const { id } = parseInput(
+        z.strictObject({ id: runIdSchema }),
+        request.params,
+      );
+      if (!service.recordings.get(id))
+        return reply.code(404).send(
+          apiErrorSchema.parse({
+            code: "not_found",
+            message: "This recording was not found.",
+          }),
+        );
+      return { records: service.recordings.truth(id) };
     });
 
     app.get("/api/health", async () => {

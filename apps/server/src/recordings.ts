@@ -4,7 +4,10 @@ import {
   recordingSchema,
   runListSchema,
   runSchema,
-  type AuthenticationEvent,
+  scenarioTruthSchema,
+  type ObservableEvent,
+  type ObservableSnapshot,
+  type ScenarioTruth,
   type Recording,
   type Run,
   type RunCommand,
@@ -60,6 +63,12 @@ export class Recordings {
         .prepare("SELECT record FROM events WHERE run_id = ? ORDER BY sequence")
         .all(id)
         .map(readJson),
+      snapshots: this.database
+        .prepare(
+          "SELECT record FROM snapshots WHERE run_id = ? ORDER BY simulation_time_ms",
+        )
+        .all(id)
+        .map(readJson),
       commands: this.database
         .prepare(
           "SELECT record FROM commands WHERE run_id = ? ORDER BY sequence",
@@ -69,7 +78,21 @@ export class Recordings {
     });
   }
 
-  create(run: Run, command: RunCommand) {
+  truth(id: string): ScenarioTruth[] {
+    return this.database
+      .prepare(
+        "SELECT record FROM scenario_truth WHERE run_id = ? ORDER BY simulation_time_ms",
+      )
+      .all(id)
+      .map((row) => scenarioTruthSchema.parse(readJson(row)));
+  }
+
+  create(
+    run: Run,
+    command: RunCommand,
+    events: ObservableEvent[] = [],
+    snapshot?: ObservableSnapshot,
+  ) {
     this.database.transaction(() => {
       this.database
         .prepare("INSERT INTO runs (id, status, record) VALUES (?, ?, ?)")
@@ -79,19 +102,50 @@ export class Recordings {
           "INSERT INTO commands (run_id, sequence, record) VALUES (?, ?, ?)",
         )
         .run(run.id, command.sequence, JSON.stringify(command));
+      this.insertEvidence(run.id, events, snapshot);
     })();
   }
 
-  commit(run: Run, events: AuthenticationEvent[] = []) {
+  commit(
+    run: Run,
+    events: ObservableEvent[] = [],
+    snapshot?: ObservableSnapshot,
+    truth?: ScenarioTruth,
+  ) {
     this.database.transaction(() => {
-      const insert = this.database.prepare(
-        "INSERT INTO events (run_id, sequence, record) VALUES (?, ?, ?)",
-      );
-      for (const event of events)
-        insert.run(run.id, event.sequence, JSON.stringify(event));
+      this.insertEvidence(run.id, events, snapshot, truth);
       this.database
         .prepare("UPDATE runs SET status = ?, record = ? WHERE id = ?")
         .run(run.status, JSON.stringify(run), run.id);
     })();
+  }
+  private insertEvidence(
+    runId: string,
+    events: ObservableEvent[],
+    snapshot?: ObservableSnapshot,
+    truth?: ScenarioTruth,
+  ) {
+    const insert = this.database.prepare(
+      "INSERT INTO events (run_id, sequence, record) VALUES (?, ?, ?)",
+    );
+    for (const event of events)
+      insert.run(runId, event.sequence, JSON.stringify(event));
+    if (snapshot)
+      this.database
+        .prepare(
+          "INSERT INTO snapshots (run_id, id, simulation_time_ms, record) VALUES (?, ?, ?, ?)",
+        )
+        .run(
+          runId,
+          snapshot.id,
+          snapshot.simulationTimeMs,
+          JSON.stringify(snapshot),
+        );
+    if (truth)
+      this.database
+        .prepare(
+          "INSERT INTO scenario_truth (run_id, simulation_time_ms, record) VALUES (?, ?, ?)",
+        )
+        .run(runId, truth.simulationTimeMs, JSON.stringify(truth));
   }
 }

@@ -121,7 +121,7 @@ it("recovers exact committed records after SIGKILL and clean shutdown without re
     const savedCompleted = await first.get(completed.run.id);
     const active = await first.start("interrupted-by-crash", 120);
     await expect
-      .poll(async () => (await first.get(active.run.id)).events.length)
+      .poll(async () => (await first.get(active.run.id)).run.simulationTimeMs)
       .toBeGreaterThan(0);
     await first.stop("SIGKILL");
 
@@ -143,6 +143,7 @@ it("recovers exact committed records after SIGKILL and clean shutdown without re
     });
     expect(recovered.events).toEqual(committed.events);
     expect(recovered.commands).toEqual(committed.commands);
+    expect(recovered.snapshots).toEqual(committed.snapshots);
     expect(await second.get(completed.run.id)).toEqual(savedCompleted);
     expect((await second.list()).runs.map((run) => run.id)).toEqual([
       active.run.id,

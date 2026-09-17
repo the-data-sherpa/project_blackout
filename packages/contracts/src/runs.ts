@@ -1,14 +1,21 @@
 import { z } from "zod";
+import {
+  fixtureSchema,
+  organizationSchema,
+  telemetryEventSchema,
+  observableSnapshotSchema,
+} from "./telemetry.js";
 
 export const startRunSchema = z.strictObject({
   seed: z.string().trim().min(1).max(128),
   durationSeconds: z.number().int().min(1).max(120).default(30),
+  fixture: fixtureSchema.default("baseline"),
 });
 
 export const runIdSchema = z.uuid();
 const simulationTimeSchema = z.number().int().nonnegative();
 
-export const manifestSchema = z.strictObject({
+export const legacyManifestSchema = z.strictObject({
   seed: startRunSchema.shape.seed,
   simulationOrigin: z.iso.datetime(),
   durationSeconds: startRunSchema.shape.durationSeconds,
@@ -26,6 +33,20 @@ export const manifestSchema = z.strictObject({
   requestedModel: z.string().nullable(),
   resolvedModel: z.string().nullable(),
 });
+
+export const telemetryManifestSchema = legacyManifestSchema.extend({
+  schemaVersion: z.literal(2),
+  generatorVersion: z.literal("telemetry/1"),
+  scenarioVersion: z.literal("fixtures/1"),
+  aggregatorVersion: z.literal("rolling-state/1"),
+  warmupMs: z.literal(900_000),
+  fixture: fixtureSchema,
+  organization: organizationSchema,
+});
+export const manifestSchema = z.discriminatedUnion("schemaVersion", [
+  legacyManifestSchema,
+  telemetryManifestSchema,
+]);
 
 export const runSchema = z.strictObject({
   id: runIdSchema,
@@ -72,12 +93,19 @@ export const commandSchema = z.strictObject({
   simulationTimeMs: simulationTimeSchema,
   recordedAt: z.iso.datetime(),
   type: z.literal("start"),
+  parameters: z.strictObject({ fixture: fixtureSchema }).optional(),
 });
+
+export const observableEventSchema = z.union([
+  telemetryEventSchema,
+  authenticationEventSchema,
+]);
 
 export const recordingSchema = z.strictObject({
   run: runSchema,
-  events: z.array(authenticationEventSchema),
+  events: z.array(observableEventSchema),
   commands: z.array(commandSchema),
+  snapshots: z.array(observableSnapshotSchema).default([]),
 });
 
 export const activeRunSchema = z.strictObject({
@@ -101,7 +129,8 @@ export const runMessageSchema = z.discriminatedUnion("type", [
   z.strictObject({
     type: z.literal("run.updated"),
     run: runSchema,
-    events: z.array(authenticationEventSchema),
+    events: z.array(observableEventSchema),
+    snapshot: observableSnapshotSchema.optional(),
   }),
   z.strictObject({
     type: z.literal("recording.error"),
@@ -118,3 +147,7 @@ export type AuthenticationEvent = z.infer<typeof authenticationEventSchema>;
 export type RunCommand = z.infer<typeof commandSchema>;
 export type Recording = z.infer<typeof recordingSchema>;
 export type RunMessage = z.infer<typeof runMessageSchema>;
+
+export type LegacyManifest = z.infer<typeof legacyManifestSchema>;
+export type TelemetryManifest = z.infer<typeof telemetryManifestSchema>;
+export type ObservableEvent = z.infer<typeof observableEventSchema>;

@@ -1,14 +1,15 @@
 import { createHash } from "node:crypto";
 import {
-  manifestSchema,
+  legacyManifestSchema,
   type AuthenticationEvent,
-  type RunManifest,
+  type LegacyManifest,
   type StartRun,
 } from "@blackout/contracts";
 
-export function createManifest(input: StartRun): RunManifest {
-  return manifestSchema.parse({
-    ...input,
+export function createManifest(input: StartRun): LegacyManifest {
+  return legacyManifestSchema.parse({
+    seed: input.seed,
+    durationSeconds: input.durationSeconds,
     simulationOrigin: "2026-01-01T09:00:00.000Z",
     tickMs: 1000,
     initialState: {
@@ -28,7 +29,7 @@ export function createManifest(input: StartRun): RunManifest {
 
 // Each position owns its randomness. Scheduling and other runs cannot consume it.
 export function authenticationStep(
-  manifest: RunManifest,
+  manifest: LegacyManifest,
   runId: string,
   simulationTimeMs: number,
 ): AuthenticationEvent[] {

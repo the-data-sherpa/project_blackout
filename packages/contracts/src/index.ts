@@ -2,6 +2,7 @@ import { z } from "zod";
 import { runMessageSchema } from "./runs.js";
 
 export * from "./runs.js";
+export * from "./telemetry.js";
 
 export const healthSchema = z.strictObject({
   status: z.literal("ok"),

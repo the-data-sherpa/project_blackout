@@ -6,16 +6,17 @@ and saved recordings, with observable evidence kept separate from scenario truth
 
 ## Current status
 
-The console can start one seeded authentication run, show its simulation clock
-and ordered events, and inspect the persisted manifest and start command. Run
-recordings use SQLite; the backend streams each step after it commits.
+M1 and M2 are implemented. The console starts a seeded 32-user, 16-host
+organization with 15 minutes of recorded baseline history. It streams authentication,
+host metrics, DNS and network events, and records five rolling windows with
+inspectable evidence and a focus identity chosen from observed activity.
 
-Stored runs remain available after backend restart. The run browser lists their
-status and opens their saved events without restarting generation. Unfinished
-runs become **Interrupted** on startup.
+Choose baseline, a minimal credential attack or a harmless anomaly to compare
+their observable state. Scenario truth stays separate from the evaluator input.
+Stored runs survive restart; unfinished runs become **Interrupted**. M1 recordings
+remain readable. No Jev API key is needed yet.
 
-The populated organization, attack controls, and Jev evaluation remain in the
-[MVP backlog](docs/MVP-TICKETS.md). No Jev API key is needed for this slice.
+See the [M2 walkthrough and state rules](docs/OBSERVABLE-STATE.md).
 
 ## Quick start with Docker
 
@@ -30,7 +31,8 @@ Open [localhost:3000](http://localhost:3000). Both connection checks should show
 [localhost:3001/api/health](http://localhost:3001/api/health).
 
 Enter a seed and duration, then choose **Start run**. The default run lasts 30
-simulation seconds and records two authentication events per second. **Completed**
+simulation seconds and records five baseline events per second, plus warm-up history.
+Choose a comparison fixture to inject additional activity during seconds 1–8. **Completed**
 appears when the last step is saved. Expand **Manifest and command log** to inspect
 the inputs. Keep the page's `?run=…` address to reopen that recording; **Refresh
 recording** reloads saved events and reconnects active-run updates. **Stored runs**
@@ -133,6 +135,5 @@ storage behavior.
 - [Full MVP roadmap: milestones M1–M9 and acceptance criteria](docs/MVP-ROADMAP.md)
 - [Published GitHub tickets and blocking dependencies](docs/MVP-TICKETS.md)
 
-The M1 tickets cover seeded runs and durable recording. The next ticket adds a
-populated synthetic organization and baseline history. The full MVP requires
-milestones M1–M9.
+The next milestone, M3, adds real Jev evaluation and a Decision Inspector.
+The full MVP requires milestones M1–M9.

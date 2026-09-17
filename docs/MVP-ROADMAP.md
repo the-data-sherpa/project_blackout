@@ -1,6 +1,6 @@
 # PROJECT: BLACKOUT — Full MVP Roadmap
 
-Status: implementation plan; no milestones implemented yet.  
+Status: M1 and M2 implemented; M3–M9 remain.
 Decision baseline: PRD review accepted by the owner on 2026-09-17.  
 Product specification: [PRD](PRD.md).  
 Implementation backlog: [31 approved GitHub tickets across M1–M9](MVP-TICKETS.md).

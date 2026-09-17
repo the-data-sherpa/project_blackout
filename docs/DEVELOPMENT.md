@@ -2,10 +2,15 @@
 
 ## Scope
 
-The app starts seeded runs, records a minimal authentication stream, and exposes
-the saved events, clock, manifest, and command log in the console. Stored runs
-remain inspectable after restart. Bounded runs complete automatically. Attack
-controls, full organization generation, and Jev evaluation belong to later tickets.
+The app starts seeded synthetic organizations with recorded baseline history,
+authentication, host metrics, DNS and network telemetry. Rolling snapshots retain
+the evidence behind every aggregate and the focus identity. Two minimal fixtures
+support comparison while scenario truth stays separate. Stored runs remain
+inspectable after restart. Bounded runs complete automatically. Jev evaluation
+begins in M3; interactive attack controls arrive in M5.
+
+See [observable state](OBSERVABLE-STATE.md) for the M2 walkthrough, exact window
+boundaries, focus rule, fixture behavior and truth boundary.
 
 ## Workspace
 
@@ -28,7 +33,9 @@ and the process supervisor is needed at this size.
 Fastify provides HTTP routing, lifecycle hooks, in-process request tests, and a
 WebSocket plugin in one server. SQLite uses `better-sqlite3`, with WAL, foreign
 keys, and a five-second busy timeout. Schema version 1 adds run, command, and event
-tables in one migration, tracked by `PRAGMA user_version`. A newer, unsupported
+tables in one migration. Version 2 adds snapshots and separate scenario truth,
+tracked by `PRAGMA user_version`. M1 recordings retain their original payloads.
+A newer, unsupported
 database version fails startup rather than being rewritten.
 
 TypeScript is pinned to 6.0.3, within the installed TypeScript ESLint parser's
@@ -113,38 +120,31 @@ a separate Compose startup check.
 
 ## Seeded run recording
 
-The first slice has three synthetic users, two workstations, and three resources.
-It generates two authentication events at each whole simulation second. Success
-and occasional failure are observations; a failure is not a hidden attack label.
-The larger organization and baseline profiles arrive with ticket #3.
+New runs use manifest schema 2 and a 32-user, 16-host organization. The start
+transaction records 15 minutes of warm-up history and an initial snapshot alongside
+the manifest and start command. Five baseline observations arrive each second;
+fixtures add events during seconds 1–8. See the [state rules](OBSERVABLE-STATE.md)
+for exact generation, sequencing, aggregation and comparison behavior.
 
-The manifest records the seed, initial entity lists, fixed simulation origin,
-duration, step size, and schema/generator/scenario versions. Policy, evaluator,
-requested-model, and resolved-model fields are explicitly null until used.
-The generator derives randomness from the version, seed, and event sequence; it
-does not consume shared randomness or wall-clock time. The simulation origin is
-`2026-01-01T09:00:00.000Z`, independently of the wall-clock creation date.
+The manifest records seed, initial entity lists and profiles, fixed simulation
+origin, duration, step size, warm-up length, fixture choice and version identifiers.
+Policy, evaluator, requested-model and resolved-model fields remain null until used.
+The simulation origin is `2026-01-01T09:00:00.000Z`, independent of wall-clock dates.
+Warm-up uses negative simulation times; the visible clock starts at zero.
 
 Each delivered timer callback advances exactly 1,000 simulation milliseconds.
-Late callbacks slow progression; they cannot skip steps or change event order.
-The first events are at 1,000 ms, and the final pair is at the selected duration.
-Sequence numbers start at 1 within each run and break same-time ties. Run UUIDs
-and creation/completion wall times differ between executions. Comparing the
-observable stream across runs excludes only the enclosing run UUID.
-
-A start command records simulation time zero, command sequence 1, and its
-wall-clock acceptance time. Duration is part of the manifest; completion is
-automatic and does not invent an operator command. Future controls will append
-their own simulation times and sequence numbers.
+Late callbacks slow progression; they cannot skip steps or alter event order.
+The first live events arrive at 1,000 ms, and the last step is at the chosen duration.
+A start command records time zero, command sequence 1 and its fixture selection.
+Completion is automatic and does not invent an operator command.
 
 The backend is the sole database writer; run only one backend per database file.
-A partial unique index also prevents two active rows. Starting a run atomically
-saves its manifest and start command before returning HTTP 201. Each later
-transaction saves both events, the clock, and terminal status before publishing
-the WebSocket update. A write failure rolls back that entire step and stops
-generation. Failure status is saved if storage permits; `recording.error` reports
-the failure even if that status cannot be saved. The frontend retains only saved
-events and shows the error. Check storage and restart the backend before retrying.
+A partial unique index also prevents two active rows. Each transaction saves events,
+snapshot, truth, clock and terminal status before publishing its WebSocket update.
+A write failure rolls back that entire step and stops generation. Failure status
+is saved if storage permits; `recording.error` reports the failure even if that
+status cannot be saved. The frontend retains only saved events and snapshots.
+Check storage and restart the backend before retrying.
 
 SQLite uses WAL with `synchronous=FULL`. Successful commits are the durability
 boundary, subject to the filesystem and device honoring SQLite's sync requests.
@@ -168,13 +168,14 @@ reports `recording.error` to subscribers, including newly connected subscribers.
 After storage is repaired, restart marks that unfinished run interrupted. Invalid
 stored payloads return a storage error, rather than blaming the request input.
 
-| API                               | Behavior                                                                                                                                                                                  |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/runs`                  | Strict JSON `{ "seed": "demo", "durationSeconds": 30 }`; seed is 1–128 trimmed characters, duration is an integer from 1–120 (default 30). Returns the committed recording with HTTP 201. |
-| `GET /api/runs?offset=0&limit=20` | Lists run summaries, total count, next offset, and active run ID. Limit accepts 1–100; offset accepts 0–1,000,000. It does not load event bodies.                                         |
-| `GET /api/runs/active`            | Returns `{ "runId": "…" }` or `{ "runId": null }`.                                                                                                                                        |
-| `GET /api/runs/:id`               | Returns the manifest, status, clock, ordered events, and ordered commands from SQLite.                                                                                                    |
-| `GET /ws?runId=<uuid>`            | Sends `connection.ready`, a full saved `run.snapshot`, then committed `run.updated` event batches or `recording.error`. Omitting `runId` gives only the connection check.                 |
+| API                               | Behavior                                                                                                                                                                                                                                                                                                 |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/runs`                  | Strict JSON `{ "seed": "demo", "durationSeconds": 30, "fixture": "baseline" }`; seed is 1–128 trimmed characters, duration is an integer from 1–120 (default 30). Fixture defaults to `baseline`; also accepts `credential-attack` or `harmless-anomaly`. Returns the committed recording with HTTP 201. |
+| `GET /api/runs?offset=0&limit=20` | Lists run summaries, total count, next offset, and active run ID. Limit accepts 1–100; offset accepts 0–1,000,000. It does not load event bodies.                                                                                                                                                        |
+| `GET /api/runs/active`            | Returns `{ "runId": "…" }` or `{ "runId": null }`.                                                                                                                                                                                                                                                       |
+| `GET /api/runs/:id`               | Returns the manifest, status, clock, ordered events, commands and snapshots from SQLite; no truth rows.                                                                                                                                                                                                  |
+| `GET /api/runs/:id/truth`         | Returns `{ "records": [...] }` from the separate truth table for explicit fixture evaluation.                                                                                                                                                                                                            |
+| `GET /ws?runId=<uuid>`            | Sends `connection.ready`, a full saved `run.snapshot`, then committed `run.updated` event batches with their snapshot or `recording.error`. Omitting `runId` gives only the connection check.                                                                                                            |
 
 Malformed requests return HTTP 400, a second active run returns 409, missing
 recordings return 404, and storage failures return 503. Unknown request fields
