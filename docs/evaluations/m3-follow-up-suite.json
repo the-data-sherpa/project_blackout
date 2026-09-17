@@ -1,0 +1,837 @@
+{
+  "id": "7750080f-753f-431b-8974-3659eb9fdd22",
+  "createdAt": "2026-09-17T08:58:57.888Z",
+  "metricVersion": "slice-metrics/2",
+  "definitions": {
+    "incident": "A successful checkpoint whose recorded application policy outcome is incident_advisory. No model values are rewritten.",
+    "detection": "First incident advisory at or after the first credential-misuse event. Simulation delay is checkpoint time minus first malicious event time, in ms. Wall delay is decision completion minus that event snapshot's recordedAt, in ms. Missing legacy timestamps yield null, never estimated timing.",
+    "miss": "No incident advisory in an attack run with every checkpoint successfully evaluated and all required policy fields available. Otherwise no detection is incomplete, not a confirmed miss.",
+    "falseIncident": "For baseline and harmless controls: incidentDecisions / (successfulCheckpoints - unevaluableCheckpoints). Failed checkpoints and successful responses missing required policy fields are excluded and reported separately; baseline before injection in attack runs is not included.",
+    "latency": "Per-attempt wall duration in ms, including recorded failures but excluding restart-interrupted attempts and retry backoff. Nearest-rank p50/p95; samples states the denominator.",
+    "cadence": "durationSimulationMs / durationWallMs is achieved simulation speed. Checkpoint count includes time zero and the terminal snapshot, even for durations not divisible by the interval.",
+    "stability": "Classification switches / comparablePairs of consecutive successful checkpoints. A failed checkpoint breaks adjacency.",
+    "tokens": "Sum of returned usage fields over attemptsWithUsage. Missing usage and interrupted attempts are not estimated.",
+    "scope": "Synthetic first-slice fixtures and fixed thresholds. This report does not establish calibrated confidence or real-world security effectiveness."
+  },
+  "runs": [
+    {
+      "runId": "735c18de-1c62-4f0a-9ee7-eb5c38f49203",
+      "seed": "m3-001",
+      "fixture": "baseline",
+      "questionVersion": "security-questions/2",
+      "requestedModel": "jev-1.13.0",
+      "returnedModels": ["jev-1.13.0"],
+      "evaluation": {
+        "checkpointMs": 5000,
+        "timeoutMs": 15000,
+        "maxAttempts": 2,
+        "retryDelayMs": 1000
+      },
+      "policy": {
+        "version": "advisory-policy/2",
+        "incidentProbability": 0.8,
+        "classificationConfidence": 0.75,
+        "incidentSeverity": 2
+      },
+      "durationSimulationMs": 20000,
+      "durationWallMs": 20572,
+      "actualSimulationSpeed": 0.9721952167995334,
+      "checkpoints": 5,
+      "successfulCheckpoints": 5,
+      "failedCheckpoints": 0,
+      "unevaluableCheckpoints": 0,
+      "attempts": 5,
+      "failedAttempts": 0,
+      "incidentDecisions": 0,
+      "firstMaliciousSimulationMs": null,
+      "detectionDelaySimulationMs": null,
+      "detectionDelayWallMs": null,
+      "attackOutcome": "not_applicable",
+      "classificationSwitches": 1,
+      "comparablePairs": 4,
+      "latencyMs": {
+        "samples": 5,
+        "p50": 417.9798520000004,
+        "p95": 490.6408080000001
+      },
+      "inputTokens": 11796,
+      "outputTokens": 622,
+      "attemptsWithUsage": 5,
+      "decisions": [
+        {
+          "attemptId": "bbb84766-ef6f-43f6-a93d-1281dfd92e63",
+          "snapshotId": "snapshot-000001",
+          "simulationTimeMs": 0,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "3c26180d-4304-4f6f-bd2a-34d4098e255d",
+          "snapshotId": "snapshot-000006",
+          "simulationTimeMs": 5000,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "483ee4ad-a5bb-442d-a1bc-04e477fbfb8c",
+          "snapshotId": "snapshot-000011",
+          "simulationTimeMs": 10000,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "5c603788-39d7-4d2b-abde-68f6eef4aa7d",
+          "snapshotId": "snapshot-000016",
+          "simulationTimeMs": 15000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "a2bd116b-0de4-4c68-b12d-07e1dbbbb94a",
+          "snapshotId": "snapshot-000021",
+          "simulationTimeMs": 20000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        }
+      ]
+    },
+    {
+      "runId": "78d09ca0-8d40-45e8-a7d9-5761c8b3e91a",
+      "seed": "m3-001",
+      "fixture": "credential-attack",
+      "questionVersion": "security-questions/2",
+      "requestedModel": "jev-1.13.0",
+      "returnedModels": ["jev-1.13.0"],
+      "evaluation": {
+        "checkpointMs": 5000,
+        "timeoutMs": 15000,
+        "maxAttempts": 2,
+        "retryDelayMs": 1000
+      },
+      "policy": {
+        "version": "advisory-policy/2",
+        "incidentProbability": 0.8,
+        "classificationConfidence": 0.75,
+        "incidentSeverity": 2
+      },
+      "durationSimulationMs": 20000,
+      "durationWallMs": 19898,
+      "actualSimulationSpeed": 1.005126143330988,
+      "checkpoints": 5,
+      "successfulCheckpoints": 5,
+      "failedCheckpoints": 0,
+      "unevaluableCheckpoints": 0,
+      "attempts": 5,
+      "failedAttempts": 0,
+      "incidentDecisions": 0,
+      "firstMaliciousSimulationMs": 1000,
+      "detectionDelaySimulationMs": null,
+      "detectionDelayWallMs": null,
+      "attackOutcome": "miss",
+      "classificationSwitches": 1,
+      "comparablePairs": 4,
+      "latencyMs": {
+        "samples": 5,
+        "p50": 368.4326160000055,
+        "p95": 398.0862630000047
+      },
+      "inputTokens": 11881,
+      "outputTokens": 631,
+      "attemptsWithUsage": 5,
+      "decisions": [
+        {
+          "attemptId": "fdda3b04-1a4e-480f-8c02-32d32114ddff",
+          "snapshotId": "snapshot-000001",
+          "simulationTimeMs": 0,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "0a1867ea-3e46-4b58-8098-73ba6806ce12",
+          "snapshotId": "snapshot-000006",
+          "simulationTimeMs": 5000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        },
+        {
+          "attemptId": "c7ee5c57-0e31-4c8b-ad41-6a45e2f5f2f9",
+          "snapshotId": "snapshot-000011",
+          "simulationTimeMs": 10000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        },
+        {
+          "attemptId": "8d0f1a04-35ad-4835-a0e4-0a96d4d6c972",
+          "snapshotId": "snapshot-000016",
+          "simulationTimeMs": 15000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        },
+        {
+          "attemptId": "7c6c4e27-d295-42b7-b158-dda31dab5e46",
+          "snapshotId": "snapshot-000021",
+          "simulationTimeMs": 20000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        }
+      ]
+    },
+    {
+      "runId": "fafe5af6-d357-46db-8649-9fd3c5f59365",
+      "seed": "m3-001",
+      "fixture": "harmless-anomaly",
+      "questionVersion": "security-questions/2",
+      "requestedModel": "jev-1.13.0",
+      "returnedModels": ["jev-1.13.0"],
+      "evaluation": {
+        "checkpointMs": 5000,
+        "timeoutMs": 15000,
+        "maxAttempts": 2,
+        "retryDelayMs": 1000
+      },
+      "policy": {
+        "version": "advisory-policy/2",
+        "incidentProbability": 0.8,
+        "classificationConfidence": 0.75,
+        "incidentSeverity": 2
+      },
+      "durationSimulationMs": 20000,
+      "durationWallMs": 20520,
+      "actualSimulationSpeed": 0.9746588693957114,
+      "checkpoints": 5,
+      "successfulCheckpoints": 5,
+      "failedCheckpoints": 0,
+      "unevaluableCheckpoints": 0,
+      "attempts": 5,
+      "failedAttempts": 0,
+      "incidentDecisions": 0,
+      "firstMaliciousSimulationMs": null,
+      "detectionDelaySimulationMs": null,
+      "detectionDelayWallMs": null,
+      "attackOutcome": "not_applicable",
+      "classificationSwitches": 3,
+      "comparablePairs": 4,
+      "latencyMs": {
+        "samples": 5,
+        "p50": 379.43849200000113,
+        "p95": 747.2902929999982
+      },
+      "inputTokens": 11832,
+      "outputTokens": 624,
+      "attemptsWithUsage": 5,
+      "decisions": [
+        {
+          "attemptId": "6e5a6715-724b-4c88-84dc-46f57bdff977",
+          "snapshotId": "snapshot-000001",
+          "simulationTimeMs": 0,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "4df18e69-5f37-407d-80fd-54e508ef3599",
+          "snapshotId": "snapshot-000006",
+          "simulationTimeMs": 5000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "624ed639-9d12-401a-a06b-c5f588ad164e",
+          "snapshotId": "snapshot-000011",
+          "simulationTimeMs": 10000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "c46f2b62-573b-4c3c-92df-e63f6ae21248",
+          "snapshotId": "snapshot-000016",
+          "simulationTimeMs": 15000,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "cdb35a54-b242-4f09-8cd6-9984a4415079",
+          "snapshotId": "snapshot-000021",
+          "simulationTimeMs": 20000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        }
+      ]
+    },
+    {
+      "runId": "97818b0e-4220-44be-ad0d-ef56412eb25e",
+      "seed": "m3-002",
+      "fixture": "baseline",
+      "questionVersion": "security-questions/2",
+      "requestedModel": "jev-1.13.0",
+      "returnedModels": ["jev-1.13.0"],
+      "evaluation": {
+        "checkpointMs": 5000,
+        "timeoutMs": 15000,
+        "maxAttempts": 2,
+        "retryDelayMs": 1000
+      },
+      "policy": {
+        "version": "advisory-policy/2",
+        "incidentProbability": 0.8,
+        "classificationConfidence": 0.75,
+        "incidentSeverity": 2
+      },
+      "durationSimulationMs": 20000,
+      "durationWallMs": 20056,
+      "actualSimulationSpeed": 0.9972078181092939,
+      "checkpoints": 5,
+      "successfulCheckpoints": 5,
+      "failedCheckpoints": 0,
+      "unevaluableCheckpoints": 0,
+      "attempts": 5,
+      "failedAttempts": 0,
+      "incidentDecisions": 0,
+      "firstMaliciousSimulationMs": null,
+      "detectionDelaySimulationMs": null,
+      "detectionDelayWallMs": null,
+      "attackOutcome": "not_applicable",
+      "classificationSwitches": 1,
+      "comparablePairs": 4,
+      "latencyMs": {
+        "samples": 5,
+        "p50": 405.5627320000058,
+        "p95": 431.9322050000046
+      },
+      "inputTokens": 11809,
+      "outputTokens": 624,
+      "attemptsWithUsage": 5,
+      "decisions": [
+        {
+          "attemptId": "8af9fd5e-99b6-400c-8489-da474e1dedb9",
+          "snapshotId": "snapshot-000001",
+          "simulationTimeMs": 0,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "3d273bb6-d18e-4308-a792-d346357f21c0",
+          "snapshotId": "snapshot-000006",
+          "simulationTimeMs": 5000,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "6a3c786e-38c7-4daf-9be0-540e5f753241",
+          "snapshotId": "snapshot-000011",
+          "simulationTimeMs": 10000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "2a9c986f-6899-4c7e-97a5-dc59d9626fb5",
+          "snapshotId": "snapshot-000016",
+          "simulationTimeMs": 15000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "a5f7a5dd-7e5b-4dbd-9fda-81efb0ff0e59",
+          "snapshotId": "snapshot-000021",
+          "simulationTimeMs": 20000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        }
+      ]
+    },
+    {
+      "runId": "18fb69c4-bc1c-464a-af86-98347b92d882",
+      "seed": "m3-002",
+      "fixture": "credential-attack",
+      "questionVersion": "security-questions/2",
+      "requestedModel": "jev-1.13.0",
+      "returnedModels": ["jev-1.13.0"],
+      "evaluation": {
+        "checkpointMs": 5000,
+        "timeoutMs": 15000,
+        "maxAttempts": 2,
+        "retryDelayMs": 1000
+      },
+      "policy": {
+        "version": "advisory-policy/2",
+        "incidentProbability": 0.8,
+        "classificationConfidence": 0.75,
+        "incidentSeverity": 2
+      },
+      "durationSimulationMs": 20000,
+      "durationWallMs": 20718,
+      "actualSimulationSpeed": 0.9653441451877595,
+      "checkpoints": 5,
+      "successfulCheckpoints": 5,
+      "failedCheckpoints": 0,
+      "unevaluableCheckpoints": 0,
+      "attempts": 5,
+      "failedAttempts": 0,
+      "incidentDecisions": 0,
+      "firstMaliciousSimulationMs": 1000,
+      "detectionDelaySimulationMs": null,
+      "detectionDelayWallMs": null,
+      "attackOutcome": "miss",
+      "classificationSwitches": 1,
+      "comparablePairs": 4,
+      "latencyMs": {
+        "samples": 5,
+        "p50": 391.1117749999976,
+        "p95": 438.31702499999665
+      },
+      "inputTokens": 11885,
+      "outputTokens": 631,
+      "attemptsWithUsage": 5,
+      "decisions": [
+        {
+          "attemptId": "e05e4c63-f4c4-48ff-b71d-e8c63b3281c4",
+          "snapshotId": "snapshot-000001",
+          "simulationTimeMs": 0,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "2fc6421a-0b60-4eee-ab56-6e0777d24202",
+          "snapshotId": "snapshot-000006",
+          "simulationTimeMs": 5000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        },
+        {
+          "attemptId": "0aed994d-bbc3-429c-b81e-10f3d982a3d1",
+          "snapshotId": "snapshot-000011",
+          "simulationTimeMs": 10000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        },
+        {
+          "attemptId": "14264caf-8171-4e88-9f9d-c16ded5e38e7",
+          "snapshotId": "snapshot-000016",
+          "simulationTimeMs": 15000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        },
+        {
+          "attemptId": "b1c31b28-029c-453c-a7d8-5d72312f1e38",
+          "snapshotId": "snapshot-000021",
+          "simulationTimeMs": 20000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        }
+      ]
+    },
+    {
+      "runId": "281d7ef6-cea1-4b99-b3ae-eeb654907270",
+      "seed": "m3-002",
+      "fixture": "harmless-anomaly",
+      "questionVersion": "security-questions/2",
+      "requestedModel": "jev-1.13.0",
+      "returnedModels": ["jev-1.13.0"],
+      "evaluation": {
+        "checkpointMs": 5000,
+        "timeoutMs": 15000,
+        "maxAttempts": 2,
+        "retryDelayMs": 1000
+      },
+      "policy": {
+        "version": "advisory-policy/2",
+        "incidentProbability": 0.8,
+        "classificationConfidence": 0.75,
+        "incidentSeverity": 2
+      },
+      "durationSimulationMs": 20000,
+      "durationWallMs": 20228,
+      "actualSimulationSpeed": 0.9887284951552304,
+      "checkpoints": 5,
+      "successfulCheckpoints": 5,
+      "failedCheckpoints": 0,
+      "unevaluableCheckpoints": 0,
+      "attempts": 5,
+      "failedAttempts": 0,
+      "incidentDecisions": 0,
+      "firstMaliciousSimulationMs": null,
+      "detectionDelaySimulationMs": null,
+      "detectionDelayWallMs": null,
+      "attackOutcome": "not_applicable",
+      "classificationSwitches": 1,
+      "comparablePairs": 4,
+      "latencyMs": {
+        "samples": 5,
+        "p50": 362.41266099999484,
+        "p95": 419.08462199999485
+      },
+      "inputTokens": 11834,
+      "outputTokens": 623,
+      "attemptsWithUsage": 5,
+      "decisions": [
+        {
+          "attemptId": "1fcfedf8-6cf8-49aa-ba0b-1bbcc490f1ee",
+          "snapshotId": "snapshot-000001",
+          "simulationTimeMs": 0,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "08cea8e8-c882-461c-b19e-f54e0f524658",
+          "snapshotId": "snapshot-000006",
+          "simulationTimeMs": 5000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "1bfd1e47-7f49-4b77-87dc-9e7d2de2f284",
+          "snapshotId": "snapshot-000011",
+          "simulationTimeMs": 10000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "bb2d50fd-313b-4b06-a53c-4d5ccbb62975",
+          "snapshotId": "snapshot-000016",
+          "simulationTimeMs": 15000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "c87a6465-98d4-4421-9955-5b8797823921",
+          "snapshotId": "snapshot-000021",
+          "simulationTimeMs": 20000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        }
+      ]
+    },
+    {
+      "runId": "c3d38573-9bbb-462b-ba17-fd0b4410f158",
+      "seed": "m3-003",
+      "fixture": "baseline",
+      "questionVersion": "security-questions/2",
+      "requestedModel": "jev-1.13.0",
+      "returnedModels": ["jev-1.13.0"],
+      "evaluation": {
+        "checkpointMs": 5000,
+        "timeoutMs": 15000,
+        "maxAttempts": 2,
+        "retryDelayMs": 1000
+      },
+      "policy": {
+        "version": "advisory-policy/2",
+        "incidentProbability": 0.8,
+        "classificationConfidence": 0.75,
+        "incidentSeverity": 2
+      },
+      "durationSimulationMs": 20000,
+      "durationWallMs": 20747,
+      "actualSimulationSpeed": 0.9639947944281101,
+      "checkpoints": 5,
+      "successfulCheckpoints": 5,
+      "failedCheckpoints": 0,
+      "unevaluableCheckpoints": 0,
+      "attempts": 5,
+      "failedAttempts": 0,
+      "incidentDecisions": 0,
+      "firstMaliciousSimulationMs": null,
+      "detectionDelaySimulationMs": null,
+      "detectionDelayWallMs": null,
+      "attackOutcome": "not_applicable",
+      "classificationSwitches": 1,
+      "comparablePairs": 4,
+      "latencyMs": {
+        "samples": 5,
+        "p50": 393.78437400000985,
+        "p95": 404.34900299998117
+      },
+      "inputTokens": 11795,
+      "outputTokens": 619,
+      "attemptsWithUsage": 5,
+      "decisions": [
+        {
+          "attemptId": "afe3d809-f4fb-4945-bc04-8c4f84c7a701",
+          "snapshotId": "snapshot-000001",
+          "simulationTimeMs": 0,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "f9902563-8e83-4f3d-98f4-07af05fd78c9",
+          "snapshotId": "snapshot-000006",
+          "simulationTimeMs": 5000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "359c59ac-f43f-4e63-96ab-2e1f9bd85dc0",
+          "snapshotId": "snapshot-000011",
+          "simulationTimeMs": 10000,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "3288de65-e097-4c51-b638-30b538bb378e",
+          "snapshotId": "snapshot-000016",
+          "simulationTimeMs": 15000,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "cc05952b-bdf7-4809-9362-d67bfd028532",
+          "snapshotId": "snapshot-000021",
+          "simulationTimeMs": 20000,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        }
+      ]
+    },
+    {
+      "runId": "91e1c787-81be-4d9b-ba6c-3f5bafc8ad10",
+      "seed": "m3-003",
+      "fixture": "credential-attack",
+      "questionVersion": "security-questions/2",
+      "requestedModel": "jev-1.13.0",
+      "returnedModels": ["jev-1.13.0"],
+      "evaluation": {
+        "checkpointMs": 5000,
+        "timeoutMs": 15000,
+        "maxAttempts": 2,
+        "retryDelayMs": 1000
+      },
+      "policy": {
+        "version": "advisory-policy/2",
+        "incidentProbability": 0.8,
+        "classificationConfidence": 0.75,
+        "incidentSeverity": 2
+      },
+      "durationSimulationMs": 20000,
+      "durationWallMs": 20182,
+      "actualSimulationSpeed": 0.9909820632246557,
+      "checkpoints": 5,
+      "successfulCheckpoints": 5,
+      "failedCheckpoints": 0,
+      "unevaluableCheckpoints": 0,
+      "attempts": 5,
+      "failedAttempts": 0,
+      "incidentDecisions": 0,
+      "firstMaliciousSimulationMs": 1000,
+      "detectionDelaySimulationMs": null,
+      "detectionDelayWallMs": null,
+      "attackOutcome": "miss",
+      "classificationSwitches": 1,
+      "comparablePairs": 4,
+      "latencyMs": {
+        "samples": 5,
+        "p50": 370.9145500000159,
+        "p95": 382.5586509999994
+      },
+      "inputTokens": 11873,
+      "outputTokens": 634,
+      "attemptsWithUsage": 5,
+      "decisions": [
+        {
+          "attemptId": "feac12c3-8d41-47d4-b55f-155a385d402a",
+          "snapshotId": "snapshot-000001",
+          "simulationTimeMs": 0,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "c0a160e5-ef5d-4350-a336-2e22482d80c1",
+          "snapshotId": "snapshot-000006",
+          "simulationTimeMs": 5000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        },
+        {
+          "attemptId": "cd952c5e-e73a-4ac9-94b2-97fa0b9f7882",
+          "snapshotId": "snapshot-000011",
+          "simulationTimeMs": 10000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        },
+        {
+          "attemptId": "5945e8e2-47cb-40be-841e-1bc127ffb958",
+          "snapshotId": "snapshot-000016",
+          "simulationTimeMs": 15000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        },
+        {
+          "attemptId": "657e4ab0-09df-47fa-9a4b-508e4e02273f",
+          "snapshotId": "snapshot-000021",
+          "simulationTimeMs": 20000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        }
+      ]
+    },
+    {
+      "runId": "7a8fc950-17d4-4a4a-ac8c-7210770e2874",
+      "seed": "m3-003",
+      "fixture": "harmless-anomaly",
+      "questionVersion": "security-questions/2",
+      "requestedModel": "jev-1.13.0",
+      "returnedModels": ["jev-1.13.0"],
+      "evaluation": {
+        "checkpointMs": 5000,
+        "timeoutMs": 15000,
+        "maxAttempts": 2,
+        "retryDelayMs": 1000
+      },
+      "policy": {
+        "version": "advisory-policy/2",
+        "incidentProbability": 0.8,
+        "classificationConfidence": 0.75,
+        "incidentSeverity": 2
+      },
+      "durationSimulationMs": 20000,
+      "durationWallMs": 19731,
+      "actualSimulationSpeed": 1.0136333688105013,
+      "checkpoints": 5,
+      "successfulCheckpoints": 5,
+      "failedCheckpoints": 0,
+      "unevaluableCheckpoints": 0,
+      "attempts": 5,
+      "failedAttempts": 0,
+      "incidentDecisions": 0,
+      "firstMaliciousSimulationMs": null,
+      "detectionDelaySimulationMs": null,
+      "detectionDelayWallMs": null,
+      "attackOutcome": "not_applicable",
+      "classificationSwitches": 1,
+      "comparablePairs": 4,
+      "latencyMs": {
+        "samples": 5,
+        "p50": 378.6049409999978,
+        "p95": 438.4952350000094
+      },
+      "inputTokens": 11820,
+      "outputTokens": 617,
+      "attemptsWithUsage": 5,
+      "decisions": [
+        {
+          "attemptId": "019fa617-4ac0-4a54-bd85-7a8975146da8",
+          "snapshotId": "snapshot-000001",
+          "simulationTimeMs": 0,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "ed247440-0df8-4fc0-be03-8db08f1616bd",
+          "snapshotId": "snapshot-000006",
+          "simulationTimeMs": 5000,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "5508f7e6-920d-4e91-a9a9-c1a2799ab02e",
+          "snapshotId": "snapshot-000011",
+          "simulationTimeMs": 10000,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "9c01f472-30b2-45fb-b6c1-5b7cd9de37bc",
+          "snapshotId": "snapshot-000016",
+          "simulationTimeMs": 15000,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        },
+        {
+          "attemptId": "8a733e2d-e647-4385-8665-4ca7c811b00e",
+          "snapshotId": "snapshot-000021",
+          "simulationTimeMs": 20000,
+          "status": "succeeded",
+          "outcome": "observe",
+          "classification": "normal",
+          "error": null
+        }
+      ]
+    }
+  ]
+}

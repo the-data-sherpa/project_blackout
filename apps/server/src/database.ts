@@ -22,8 +22,8 @@ export function openDatabase(filename: string) {
 
 function migrate(database: Database.Database) {
   const version = database.pragma("user_version", { simple: true });
-  if (version === 2) return;
-  if (version !== 0 && version !== 1)
+  if (version === 3) return;
+  if (version !== 0 && version !== 1 && version !== 2)
     throw new Error(`Unsupported database version: ${String(version)}`);
   if (version === 0)
     database.transaction(() => {
@@ -49,8 +49,9 @@ function migrate(database: Database.Database) {
       PRAGMA user_version = 1;
     `);
     })();
-  database.transaction(() => {
-    database.exec(`
+  if (version === 0 || version === 1)
+    database.transaction(() => {
+      database.exec(`
       CREATE TABLE snapshots (
         run_id TEXT NOT NULL REFERENCES runs(id),
         id TEXT NOT NULL,
@@ -66,6 +67,25 @@ function migrate(database: Database.Database) {
         PRIMARY KEY (run_id, simulation_time_ms)
       );
       PRAGMA user_version = 2;
+    `);
+    })();
+  database.transaction(() => {
+    database.exec(`
+      CREATE TABLE inference_attempts (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        snapshot_id TEXT NOT NULL,
+        simulation_time_ms INTEGER NOT NULL,
+        attempt_number INTEGER NOT NULL,
+        record TEXT NOT NULL,
+        FOREIGN KEY (run_id, snapshot_id) REFERENCES snapshots(run_id, id),
+        UNIQUE (run_id, snapshot_id, attempt_number)
+      );
+      CREATE TABLE evaluation_reports (
+        id TEXT PRIMARY KEY,
+        record TEXT NOT NULL
+      );
+      PRAGMA user_version = 3;
     `);
   })();
 }

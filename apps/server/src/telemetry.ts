@@ -72,7 +72,9 @@ function createOrganization(seed: string): Organization {
 export function createTelemetryManifest(input: StartRun): TelemetryManifest {
   const organization = createOrganization(input.seed);
   return telemetryManifestSchema.parse({
-    ...input,
+    seed: input.seed,
+    durationSeconds: input.durationSeconds,
+    fixture: input.fixture,
     simulationOrigin: "2026-01-01T09:00:00.000Z",
     tickMs: 1000,
     initialState: {

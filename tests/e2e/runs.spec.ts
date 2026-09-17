@@ -1,6 +1,123 @@
 import { expect, test } from "@playwright/test";
+import { recordingSchema, type JevResponse } from "@blackout/contracts";
+import { evaluatePolicy } from "../../apps/server/src/policy.js";
 
 test.describe.configure({ mode: "serial" });
+
+test("records unavailable Jev attempts and inspects saved model and policy evidence", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: "Start run", exact: true }),
+  ).toBeEnabled();
+  await page.getByLabel("Seed", { exact: true }).fill("browser-jev");
+  await page.getByLabel("Duration (simulation seconds)").fill("1");
+  await page.getByLabel("Evaluate with Jev (uses API credits)").check();
+  await page.getByRole("button", { name: "Start run", exact: true }).click();
+  await expect(page.getByText("Completed", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("No successful decision yet. Risk is unknown."),
+  ).toBeVisible();
+  await page
+    .getByLabel("Decision Inspector", { exact: true })
+    .selectOption({ label: "0s · attempt 1 · failed" });
+  await page
+    .getByText("Exact request: questions and observable state", { exact: true })
+    .click();
+  await expect(
+    page.locator("details[open] pre").filter({ hasText: '"compromise"' }),
+  ).toContainText('"type": "noul"');
+  await page
+    .getByText("Application policy: unevaluable", { exact: true })
+    .click();
+  await expect(
+    page.getByText("severity >= 2 (0–3):", { exact: false }),
+  ).toContainText("Unevaluable");
+
+  const id = (await page.getByTestId("run-id").textContent())!;
+  const saved = recordingSchema.parse(
+    await (await request.get(`http://localhost:3101/api/runs/${id}`)).json(),
+  );
+  const attempt = saved.attempts[0]!;
+  const response: JevResponse = {
+    model: "jev-ui-test",
+    answers: {
+      compromise: { type: "noul", noul: 0.85 },
+      classification: {
+        type: "choice",
+        choice: "compromise",
+        confidence: 0.9,
+        probabilities: {
+          normal: 0,
+          benign_anomaly: 0,
+          suspicious: 0.05,
+          compromise: 0.95,
+        },
+      },
+      severity: {
+        type: "score",
+        score: 2,
+        probabilities: { "0": 0, "1": 0, "2": 1, "3": 0 },
+        legend: Object.fromEntries(
+          attempt.request.questions.severity.criteria.map((value, index) => [
+            String(index),
+            value,
+          ]),
+        ),
+        confidence: 1,
+      },
+      response: {
+        type: "choice",
+        choice: "escalate",
+        confidence: 1,
+        probabilities: { observe: 0, investigate: 0, escalate: 1 },
+      },
+    },
+  };
+  // Browser-only fixture: real transport/persistence is verified in integration tests and the live smoke run.
+  saved.attempts[0] = {
+    ...attempt,
+    status: "succeeded",
+    error: null,
+    response,
+    responseBody: JSON.stringify(response),
+    policy: evaluatePolicy(response),
+  };
+  await page.route(`**/api/runs/${id}`, (route) =>
+    route.fulfill({ json: saved }),
+  );
+  await page.reload();
+  await expect(
+    page.getByLabel("Decision Inspector", { exact: true }),
+  ).toHaveValue(attempt.id);
+  await expect(page.getByText("85.0%", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Last successful decision:", { exact: false }),
+  ).toContainText("Snapshot age: 1.0 simulation seconds");
+  await page
+    .getByText("Application policy: incident_advisory", { exact: true })
+    .click();
+  await expect(
+    page.getByText("compromise probability >= 0.8:", { exact: false }),
+  ).toContainText("Matched");
+  await page
+    .getByText("Model response and distributions", { exact: true })
+    .click();
+  await expect(
+    page.locator("details[open] pre").filter({ hasText: '"jev-ui-test"' }),
+  ).toContainText('"confidence": 0.9');
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(
+    page.getByLabel("Decision Inspector", { exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
 
 test("starts, watches, reloads and inspects isolated seeded recordings", async ({
   page,

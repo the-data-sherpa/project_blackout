@@ -65,14 +65,14 @@ it("migrates a version-1 database without changing its legacy recording", async 
       authenticationStep(manifest, id, 1000),
     );
     database.exec(
-      "DROP TABLE snapshots; DROP TABLE scenario_truth; PRAGMA user_version = 1;",
+      "DROP TABLE inference_attempts; DROP TABLE evaluation_reports; DROP TABLE snapshots; DROP TABLE scenario_truth; PRAGMA user_version = 1;",
     );
   } finally {
     database.close();
   }
   const migrated = openDatabase(filename);
   try {
-    expect(migrated.pragma("user_version", { simple: true })).toBe(2);
+    expect(migrated.pragma("user_version", { simple: true })).toBe(3);
     const saved = new Recordings(migrated).get(id)!;
     expect(saved.run.manifest).toEqual(manifest);
     expect(saved.events).toEqual(authenticationStep(manifest, id, 1000));

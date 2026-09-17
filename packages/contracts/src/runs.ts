@@ -1,5 +1,10 @@
 import { z } from "zod";
 import {
+  evaluationConfigSchema,
+  inferenceAttemptSchema,
+  policyConfigSchema,
+} from "./decisions.js";
+import {
   fixtureSchema,
   organizationSchema,
   telemetryEventSchema,
@@ -10,6 +15,7 @@ export const startRunSchema = z.strictObject({
   seed: z.string().trim().min(1).max(128),
   durationSeconds: z.number().int().min(1).max(120).default(30),
   fixture: fixtureSchema.default("baseline"),
+  evaluate: z.boolean().default(false),
 });
 
 export const runIdSchema = z.uuid();
@@ -42,6 +48,8 @@ export const telemetryManifestSchema = legacyManifestSchema.extend({
   warmupMs: z.literal(900_000),
   fixture: fixtureSchema,
   organization: organizationSchema,
+  evaluation: evaluationConfigSchema.optional(),
+  policy: policyConfigSchema.optional(),
 });
 export const manifestSchema = z.discriminatedUnion("schemaVersion", [
   legacyManifestSchema,
@@ -106,6 +114,7 @@ export const recordingSchema = z.strictObject({
   events: z.array(observableEventSchema),
   commands: z.array(commandSchema),
   snapshots: z.array(observableSnapshotSchema).default([]),
+  attempts: z.array(inferenceAttemptSchema).default([]),
 });
 
 export const activeRunSchema = z.strictObject({
@@ -122,6 +131,11 @@ export const apiErrorSchema = z.strictObject({
 });
 
 export const runMessageSchema = z.discriminatedUnion("type", [
+  z.strictObject({
+    type: z.literal("inference.updated"),
+    runId: runIdSchema,
+    attempt: inferenceAttemptSchema,
+  }),
   z.strictObject({
     type: z.literal("run.snapshot"),
     recording: recordingSchema,

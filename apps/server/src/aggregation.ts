@@ -174,6 +174,7 @@ export function createSnapshot(
       runId,
       simulationTimeMs,
       input: aggregateInput(organization, events, simulationTimeMs),
+      recordedAt: new Date().toISOString(),
     }),
   );
 }

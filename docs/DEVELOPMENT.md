@@ -6,8 +6,9 @@ The app starts seeded synthetic organizations with recorded baseline history,
 authentication, host metrics, DNS and network telemetry. Rolling snapshots retain
 the evidence behind every aggregate and the focus identity. Two minimal fixtures
 support comparison while scenario truth stays separate. Stored runs remain
-inspectable after restart. Bounded runs complete automatically. Jev evaluation
-begins in M3; interactive attack controls arrive in M5.
+inspectable after restart. Bounded runs complete automatically. Opt-in Jev evaluation
+records model decisions and policies; interactive attack controls arrive in M5.
+See [Jev evaluation](JEV-EVALUATION.md) for contracts, pacing, and the report runner.
 
 See [observable state](OBSERVABLE-STATE.md) for the M2 walkthrough, exact window
 boundaries, focus rule, fixture behavior and truth boundary.
@@ -34,7 +35,8 @@ Fastify provides HTTP routing, lifecycle hooks, in-process request tests, and a
 WebSocket plugin in one server. SQLite uses `better-sqlite3`, with WAL, foreign
 keys, and a five-second busy timeout. Schema version 1 adds run, command, and event
 tables in one migration. Version 2 adds snapshots and separate scenario truth,
-tracked by `PRAGMA user_version`. M1 recordings retain their original payloads.
+tracked by `PRAGMA user_version`. Version 3 adds inference attempts and evaluation
+reports. M1/M2 recordings retain their original payloads.
 A newer, unsupported
 database version fails startup rather than being rewritten.
 
@@ -89,7 +91,14 @@ Changing the root environment requires restarting the processes.
 | `LOG_LEVEL`          | `info`                   | Fastify log level                                       |
 
 `PUBLIC_BACKEND_URL` is intentionally public; it must never contain credentials.
-Jev credentials are not configured or consumed until the evaluator is implemented.
+`JEV_API_KEY` is server-only and used only for opted-in runs. `JEV_MODEL` defaults
+to `jev-1.13.0`. `JEV_CHECKPOINT_MS=5000`, `JEV_TIMEOUT_MS=15000`, and
+`JEV_MAX_ATTEMPTS=2` set the bounded lifecycle. Allowed ranges are 1,000–30,000 ms
+(whole seconds), 100–60,000 ms, and 1–2 attempts respectively.
+`POLICY_INCIDENT_PROBABILITY=0.8`, `POLICY_CLASSIFICATION_CONFIDENCE=0.75`, and
+`POLICY_INCIDENT_SEVERITY=2` configure provisional thresholds. Probability and
+confidence range from 0–1, severity from 0–3. Compose forwards these variables
+from `.env`. `BLACKOUT_API_URL` selects the evaluation CLI's running backend.
 Local `.env` files, databases, build output, and test artifacts are ignored by git.
 
 ## Checks

@@ -415,7 +415,12 @@ it.each(["credential-attack", "harmless-anomaly"] as const)(
         values.map((value) => ({ ...value, runId: "" }));
       expect(rerun.run.manifest).toEqual(saved.run.manifest);
       expect(withoutRun(rerun.events)).toEqual(withoutRun(saved.events));
-      expect(withoutRun(rerun.snapshots)).toEqual(withoutRun(saved.snapshots));
+      const observableSnapshots = (recording: typeof saved) =>
+        withoutRun(recording.snapshots).map((snapshot) => ({
+          ...snapshot,
+          recordedAt: undefined,
+        }));
+      expect(observableSnapshots(rerun)).toEqual(observableSnapshots(saved));
       expect(withoutRun(recordings.truth(second.run.id))).toEqual(
         withoutRun(recordings.truth(first.run.id)),
       );

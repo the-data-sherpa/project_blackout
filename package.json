@@ -27,6 +27,7 @@
     "test": "npm run build:contracts && vitest run",
     "test:watch": "npm run build:contracts && vitest",
     "test:e2e": "playwright test",
+    "evaluate": "npm run build:contracts && dotenv -e .env -- node scripts/evaluate.mjs",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test"
   },
   "devDependencies": {

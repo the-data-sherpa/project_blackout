@@ -5,6 +5,12 @@ import {
   runListSchema,
   runSchema,
   scenarioTruthSchema,
+  inferenceAttemptSchema,
+  observableSnapshotSchema,
+  summarizeInput,
+  type InferenceAttempt,
+  evaluationReportSchema,
+  type EvaluationReport,
   type ObservableEvent,
   type ObservableSnapshot,
   type ScenarioTruth,
@@ -59,6 +65,7 @@ export class Recordings {
     if (!row) return null;
     return recordingSchema.parse({
       run: readJson(row),
+      attempts: this.attempts(id),
       events: this.database
         .prepare("SELECT record FROM events WHERE run_id = ? ORDER BY sequence")
         .all(id)
@@ -85,6 +92,66 @@ export class Recordings {
       )
       .all(id)
       .map((row) => scenarioTruthSchema.parse(readJson(row)));
+  }
+
+  attempts(id: string): InferenceAttempt[] {
+    return this.database
+      .prepare(
+        "SELECT record FROM inference_attempts WHERE run_id = ? ORDER BY simulation_time_ms, attempt_number",
+      )
+      .all(id)
+      .map((row) => inferenceAttemptSchema.parse(readJson(row)));
+  }
+
+  reports() {
+    return this.database
+      .prepare(
+        "SELECT record FROM evaluation_reports ORDER BY json_extract(record, '$.createdAt') DESC",
+      )
+      .all()
+      .map((row) => evaluationReportSchema.parse(readJson(row)));
+  }
+
+  saveReport(report: EvaluationReport) {
+    this.database
+      .prepare("INSERT INTO evaluation_reports (id, record) VALUES (?, ?)")
+      .run(report.id, JSON.stringify(evaluationReportSchema.parse(report)));
+  }
+
+  saveAttempt(value: InferenceAttempt, run?: Run) {
+    const attempt = inferenceAttemptSchema.parse(value);
+    const snapshot = this.database
+      .prepare("SELECT record FROM snapshots WHERE run_id = ? AND id = ?")
+      .get(attempt.runId, attempt.snapshotId);
+    const input = snapshot
+      ? observableSnapshotSchema.parse(readJson(snapshot)).input
+      : null;
+    const expected =
+      input &&
+      (attempt.request.state.schemaVersion === "observable-summary/1"
+        ? summarizeInput(input)
+        : input);
+    if (
+      !expected ||
+      JSON.stringify(expected) !== JSON.stringify(attempt.request.state)
+    )
+      throw new Error("Inference request does not match its recorded snapshot");
+    this.database.transaction(() => {
+      this.database
+        .prepare(
+          `INSERT INTO inference_attempts (id, run_id, snapshot_id, simulation_time_ms, attempt_number, record)
+      VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET record = excluded.record`,
+        )
+        .run(
+          attempt.id,
+          attempt.runId,
+          attempt.snapshotId,
+          attempt.simulationTimeMs,
+          attempt.attemptNumber,
+          JSON.stringify(attempt),
+        );
+      if (run) this.commit(run);
+    })();
   }
 
   create(

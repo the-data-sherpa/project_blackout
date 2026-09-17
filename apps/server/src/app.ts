@@ -11,16 +11,21 @@ import {
   runListQuerySchema,
   serverMessageSchema,
   startRunSchema,
+  type RunMessage,
 } from "@blackout/contracts";
 import { openDatabase } from "./database.js";
 import { Recordings } from "./recordings.js";
 import { RunError, Runs } from "./runs.js";
+import type { EvaluatorOptions } from "./evaluator.js";
+import { defaultEvaluation } from "./evaluator.js";
+import { createEvaluationReport } from "./evaluation-report.js";
 
 type AppOptions = {
   databasePath: string;
   webOrigin: string;
   logLevel?: string;
   schedule?: (tick: () => void) => () => void;
+  evaluator?: EvaluatorOptions;
 };
 
 function scheduleTicks(tick: () => void) {
@@ -46,14 +51,14 @@ export async function buildApp(options: AppOptions) {
   app.addHook("onClose", async () => {
     stopTicks?.();
     try {
-      runs?.interrupt();
+      await runs?.close();
     } finally {
       database.close();
     }
   });
 
   try {
-    const service = new Runs(new Recordings(database));
+    const service = new Runs(new Recordings(database), options.evaluator);
     runs = service;
     stopTicks = (options.schedule ?? scheduleTicks)(() => service.tick());
     await app.register(cors, { origin: options.webOrigin });
@@ -93,6 +98,55 @@ export async function buildApp(options: AppOptions) {
     app.post("/api/runs", async (request, reply) => {
       const recording = service.start(parseInput(startRunSchema, request.body));
       return reply.code(201).send(recordingSchema.parse(recording));
+    });
+
+    app.get("/api/evaluator", async () => ({
+      configured: Boolean(options.evaluator?.apiKey),
+      model: options.evaluator?.model ?? "jev-1.13.0",
+      config: options.evaluator?.config ?? defaultEvaluation,
+    }));
+
+    app.get("/api/evaluation-reports", async () => ({
+      reports: service.recordings.reports(),
+    }));
+    app.post("/api/evaluation-reports", async (request, reply) => {
+      const { runIds } = parseInput(
+        z.strictObject({
+          runIds: z
+            .array(runIdSchema)
+            .min(1)
+            .max(30)
+            .refine((ids) => new Set(ids).size === ids.length),
+        }),
+        request.body,
+      );
+      const records = runIds.map((id) => ({
+        recording: service.recordings.get(id),
+        truth: service.recordings.truth(id),
+      }));
+      if (
+        records.some(
+          ({ recording }) =>
+            !recording ||
+            recording.run.status !== "completed" ||
+            recording.run.manifest.schemaVersion !== 2 ||
+            !recording.run.manifest.evaluation,
+        )
+      )
+        return reply.code(400).send(
+          apiErrorSchema.parse({
+            code: "invalid_input",
+            message: "Select completed Jev-evaluated runs for the report.",
+          }),
+        );
+      const report = createEvaluationReport(
+        records.map(({ recording, truth }) => ({
+          recording: recording!,
+          truth,
+        })),
+      );
+      service.recordings.saveReport(report);
+      return reply.code(201).send(report);
     });
 
     app.get("/api/runs", async (request) => {
@@ -175,15 +229,24 @@ export async function buildApp(options: AppOptions) {
           .strictObject({ runId: runIdSchema.optional() })
           .parse(request.query);
         if (!runId) return;
-        const send = (message: unknown) => {
+        let initialBytes = 0;
+        const send = (message: RunMessage) => {
           if (socket.readyState !== 1) return;
           // A slow or disconnected browser must not stop the recorder.
-          if (socket.bufferedAmount > 1024 * 1024) {
+          // The bounded recording can itself exceed 1 MiB. Allow its initial
+          // transfer plus at most 1 MiB of queued updates until it flushes.
+          if (socket.bufferedAmount > initialBytes + 1024 * 1024) {
             socket.close(1013, "Reconnect to load saved events");
             return;
           }
           try {
-            socket.send(JSON.stringify(serverMessageSchema.parse(message)));
+            const payload = JSON.stringify(serverMessageSchema.parse(message));
+            const initial = message.type === "run.snapshot";
+            if (initial) initialBytes = Buffer.byteLength(payload);
+            socket.send(payload, (error) => {
+              if (initial) initialBytes = 0;
+              if (error) socket.terminate();
+            });
           } catch {
             socket.terminate();
           }
@@ -201,7 +264,7 @@ export async function buildApp(options: AppOptions) {
         socket.on("error", unsubscribe);
         send({
           type: "run.snapshot",
-          recording: service.recordings.get(runId),
+          recording: service.recordings.get(runId)!,
         });
         if (service.recordingFailure?.runId === runId)
           send(service.recordingFailure);

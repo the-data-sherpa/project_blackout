@@ -1,0 +1,90 @@
+{
+  "id": "0dc050b5-f99b-4cbc-ae4e-52408e8ea731",
+  "createdAt": "2026-09-17T08:47:39.663Z",
+  "metricVersion": "slice-metrics/1",
+  "definitions": {
+    "incident": "A successful checkpoint whose recorded application policy outcome is incident_advisory. No model values are rewritten.",
+    "detection": "First incident advisory at or after the first credential-misuse event. Simulation delay is checkpoint time minus first malicious event time, in ms. Wall delay is decision completion minus that event snapshot's recordedAt, in ms. Missing legacy timestamps yield null, never estimated timing.",
+    "miss": "No incident advisory in an attack run with every checkpoint successfully evaluated. Otherwise no detection is incomplete, not a confirmed miss.",
+    "falseIncident": "For baseline and harmless controls: incidentDecisions / successfulCheckpoints. Failed checkpoints are excluded from that fraction and reported separately; baseline before injection in attack runs is not included.",
+    "latency": "Per-attempt wall duration in ms, including recorded failures but excluding restart-interrupted attempts and retry backoff. Nearest-rank p50/p95; samples states the denominator.",
+    "cadence": "durationSimulationMs / durationWallMs is achieved simulation speed. Checkpoint count includes time zero and the terminal snapshot, even for durations not divisible by the interval.",
+    "stability": "Classification switches / comparablePairs of consecutive successful checkpoints. A failed checkpoint breaks adjacency.",
+    "tokens": "Sum of returned usage fields over attemptsWithUsage. Missing usage and interrupted attempts are not estimated.",
+    "scope": "Synthetic first-slice fixtures and fixed thresholds. This report does not establish calibrated confidence or real-world security effectiveness."
+  },
+  "runs": [
+    {
+      "runId": "a85e64c1-561e-4b67-a6b2-305d947f5f4f",
+      "seed": "m3-smoke-001",
+      "fixture": "credential-attack",
+      "questionVersion": "security-questions/2",
+      "requestedModel": "jev-1.13.0",
+      "returnedModels": ["jev-1.13.0"],
+      "evaluation": {
+        "checkpointMs": 5000,
+        "timeoutMs": 15000,
+        "maxAttempts": 2,
+        "retryDelayMs": 1000
+      },
+      "policy": {
+        "version": "advisory-policy/1",
+        "incidentProbability": 0.8,
+        "classificationConfidence": 0.75,
+        "incidentSeverity": 2
+      },
+      "durationSimulationMs": 6000,
+      "durationWallMs": 6789,
+      "actualSimulationSpeed": 0.8837825894829872,
+      "checkpoints": 3,
+      "successfulCheckpoints": 3,
+      "failedCheckpoints": 0,
+      "attempts": 3,
+      "failedAttempts": 0,
+      "incidentDecisions": 0,
+      "firstMaliciousSimulationMs": 1000,
+      "detectionDelaySimulationMs": null,
+      "detectionDelayWallMs": null,
+      "attackOutcome": "miss",
+      "classificationSwitches": 1,
+      "comparablePairs": 2,
+      "latencyMs": {
+        "samples": 3,
+        "p50": 395.203499999996,
+        "p95": 540.4975830000039
+      },
+      "inputTokens": 7145,
+      "outputTokens": 380,
+      "attemptsWithUsage": 3,
+      "decisions": [
+        {
+          "attemptId": "b748bee4-790e-4c2f-b8bb-afada9b959e0",
+          "snapshotId": "snapshot-000001",
+          "simulationTimeMs": 0,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "suspicious",
+          "error": null
+        },
+        {
+          "attemptId": "240c4a99-47e6-457b-8f6f-71c82f64d0f6",
+          "snapshotId": "snapshot-000006",
+          "simulationTimeMs": 5000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        },
+        {
+          "attemptId": "41543354-df07-4924-b983-60cd5d2d9a5a",
+          "snapshotId": "snapshot-000007",
+          "simulationTimeMs": 6000,
+          "status": "succeeded",
+          "outcome": "review",
+          "classification": "compromise",
+          "error": null
+        }
+      ]
+    }
+  ]
+}

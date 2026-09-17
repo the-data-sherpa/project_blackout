@@ -246,7 +246,7 @@ it("publishes only committed records, and preserves them across reopen", () => {
   const reopened = openDatabase(path);
   try {
     expect(new Recordings(reopened).get(started.run.id)).toEqual(expected);
-    expect(reopened.pragma("user_version", { simple: true })).toBe(2);
+    expect(reopened.pragma("user_version", { simple: true })).toBe(3);
     expect(reopened.pragma("synchronous", { simple: true })).toBe(2);
   } finally {
     reopened.close();
@@ -317,7 +317,7 @@ it("does not rewind a committed step when a transport subscriber throws", () => 
   const unsubscribe = runs.subscribe(() => {
     throw new Error("Socket closed");
   });
-  expect(() => runs.tick()).toThrow("Socket closed");
+  expect(() => runs.tick()).not.toThrow();
   expect(recordings.get(started.run.id)?.run).toMatchObject({
     status: "running",
     simulationTimeMs: 1000,

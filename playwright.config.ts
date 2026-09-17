@@ -18,6 +18,7 @@ export default defineConfig({
         WEB_ORIGIN: "http://localhost:3100",
         DATABASE_PATH: ":memory:",
         LOG_LEVEL: "warn",
+        JEV_API_KEY: "",
       },
       reuseExistingServer: false,
     },

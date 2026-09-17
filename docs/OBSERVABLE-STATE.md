@@ -22,7 +22,7 @@ it does not regenerate old recordings.
    Inspect **Allowlisted evaluator input** and the separate **Scenario metadata**.
 
 The snapshots contain observations and deterministic calculations. Jev evaluation
-begins in M3. The two fixtures are small controls for that first slice; the full
+is opt-in for M3. The two fixtures are small controls for that first slice; the full
 scenario and interactive attack controls belong to M4 and M5.
 
 ## Organization and history
@@ -150,13 +150,15 @@ The manifest does contain run controls and fixture choice; it is not evaluator i
 `simulationTimeMs`, `windows` and `focus`. Nested structures are strict too. The
 aggregator accepts an organization, observations and a simulation time, never a
 manifest, command, fixture or truth record. The snapshot wrapper carries recording
-IDs; its `.input` is the payload for future evaluation. Seeds, wall clocks, run
-controls, scenario names/stages and truth labels are excluded.
+IDs and a wall timestamp. M3 derives a strict compact model payload from `.input`,
+preserving observed metric values and profiles while keeping evidence-reference
+arrays in the recording. See [Jev input revisions](JEV-EVALUATION.md). Seeds, wall
+clocks, run controls, scenario names/stages and truth labels are excluded.
 
 The event and snapshot payloads do not change if only persisted truth is changed.
 Tests also check strict nested allowlists, ordinary source labels and IDs,
 shared baseline randomness, evidence-derived focus and complete fixture reruns.
-M3 will evaluate whether these observable features are useful to Jev; M2 makes no
+M3 measures whether these observable features are useful to Jev; M2 makes no
 model-quality or calibrated-confidence claim.
 
 ## Durability and verification

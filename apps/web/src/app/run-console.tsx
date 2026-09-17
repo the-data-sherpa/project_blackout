@@ -14,6 +14,8 @@ import {
 } from "@blackout/contracts";
 import { RunBrowser } from "./run-browser";
 import { TelemetryInspector } from "./telemetry-inspector";
+import { DecisionInspector } from "./decision-inspector";
+import { EvaluationReports } from "./evaluation-reports";
 
 const buttonClass =
   "min-h-11 rounded border border-slate-500 px-4 py-2 text-sm hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-60";
@@ -26,6 +28,7 @@ const statusLabels = {
 
 export function RunConsole({ backendUrl }: { backendUrl: string }) {
   const [fixture, setFixture] = useState<Fixture>("baseline");
+  const [evaluate, setEvaluate] = useState(false);
   const [seed, setSeed] = useState("blackout-demo-001");
   const [duration, setDuration] = useState("30");
   const [runId, setRunId] = useState<string | null>(null);
@@ -119,6 +122,27 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               if (message.runId === runId) setError(message.message);
               return;
             }
+            if (message.type === "inference.updated") {
+              if (message.runId !== runId) throw new Error("Unexpected run");
+              setRecording((previous) =>
+                !previous || previous.run.id !== runId
+                  ? previous
+                  : {
+                      ...previous,
+                      attempts: [
+                        ...previous.attempts.filter(
+                          (item) => item.id !== message.attempt.id,
+                        ),
+                        message.attempt,
+                      ].sort(
+                        (a, b) =>
+                          a.simulationTimeMs - b.simulationTimeMs ||
+                          a.attemptNumber - b.attemptNumber,
+                      ),
+                    },
+              );
+              return;
+            }
             const next =
               message.type === "run.snapshot"
                 ? message.recording.run
@@ -195,6 +219,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
       seed,
       durationSeconds: Number(duration),
       fixture,
+      evaluate,
     });
     if (!input.success) {
       setError(
@@ -219,6 +244,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
       setActiveRunId(saved.run.id);
       const url = new URL(window.location.href);
       url.searchParams.set("run", saved.run.id);
+      url.searchParams.delete("decision");
       window.history.replaceState(null, "", url);
     } catch (cause) {
       setError(
@@ -239,6 +265,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
     setAttempt((value) => value + 1);
     const url = new URL(window.location.href);
     url.searchParams.set("run", id);
+    url.searchParams.delete("decision");
     window.history.replaceState(null, "", url);
   }
   const loading = busy || (runId !== null && run?.id !== runId);
@@ -257,7 +284,8 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
         <p className="mt-3 max-w-2xl leading-relaxed text-slate-300">
           Inspect a synthetic organization, watch its telemetry and trace
           rolling state to recorded evidence. The same versioned inputs
-          reproduce the stream. No Jev calls are made.
+          reproduce the stream. Enable Jev to record model decisions alongside
+          the evidence.
         </p>
       </div>
       <form
@@ -317,6 +345,20 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
             <option value="harmless-anomaly">Harmless anomaly</option>
           </select>
         </label>
+        <label className="mt-4 flex min-h-11 items-center gap-3 text-sm text-slate-200">
+          <input
+            type="checkbox"
+            name="evaluate"
+            checked={evaluate}
+            onChange={(event) => setEvaluate(event.target.checked)}
+            className="h-5 w-5"
+          />
+          Evaluate with Jev (uses API credits)
+        </label>
+        <p className="mt-2 text-sm text-slate-400">
+          With default settings, a 30-second run uses 7 requests, up to 14 with
+          retries. Missing credentials produce recorded unavailable attempts.
+        </p>
         <p className="mt-3 text-sm text-slate-400">
           One active run at a time. Each run ends at its chosen duration.
         </p>
@@ -339,6 +381,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
         onSelect={selectRun}
         onActiveRun={setActiveRunId}
       />
+      <EvaluationReports backendUrl={backendUrl} />
       {error && (
         <div
           role="alert"
@@ -472,6 +515,11 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               )}
             </pre>
           </details>
+          <DecisionInspector
+            key={`decisions-${run.id}`}
+            recording={recording}
+            connected={stream === "Connected"}
+          />
           <TelemetryInspector
             key={run.id}
             recording={recording}

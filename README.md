@@ -6,17 +6,23 @@ and saved recordings, with observable evidence kept separate from scenario truth
 
 ## Current status
 
-M1 and M2 are implemented. The console starts a seeded 32-user, 16-host
+M1–M3 are implemented, including a real Jev smoke run and saved fixture reports.
+The console starts a seeded 32-user, 16-host
 organization with 15 minutes of recorded baseline history. It streams authentication,
 host metrics, DNS and network events, and records five rolling windows with
 inspectable evidence and a focus identity chosen from observed activity.
 
 Choose baseline, a minimal credential attack or a harmless anomaly to compare
 their observable state. Scenario truth stays separate from the evaluator input.
-Stored runs survive restart; unfinished runs become **Interrupted**. M1 recordings
-remain readable. No Jev API key is needed yet.
+Stored runs survive restart. Unfinished runs become **Interrupted**. M1 recordings
+remain readable.
+
+Telemetry-only runs need no API key. Opt-in Jev evaluation adds
+recorded decisions, deterministic advisory policies, and a Decision Inspector.
+API failures stay visible and do not become low-risk decisions.
 
 See the [M2 walkthrough and state rules](docs/OBSERVABLE-STATE.md).
+See the [M3 evaluator and measurement guide](docs/JEV-EVALUATION.md).
 
 ## Quick start with Docker
 
@@ -33,8 +39,10 @@ Open [localhost:3000](http://localhost:3000). Both connection checks should show
 Enter a seed and duration, then choose **Start run**. The default run lasts 30
 simulation seconds and records five baseline events per second, plus warm-up history.
 Choose a comparison fixture to inject additional activity during seconds 1–8. **Completed**
-appears when the last step is saved. Expand **Manifest and command log** to inspect
-the inputs. Keep the page's `?run=…` address to reopen that recording; **Refresh
+appears when the backend saves the last step. Expand **Manifest and command log** to inspect
+the inputs.
+
+Keep the page's `?run=…` address to reopen that recording. **Refresh
 recording** reloads saved events and reconnects active-run updates. **Stored runs**
 lists saved recordings, newest first. Choose a row to inspect it, or choose
 **View active run** to return to ongoing generation. Closing the browser does
@@ -74,13 +82,77 @@ Stop Compose before starting local development: both use ports 3000 and 3001.
 Local development stores SQLite at `data/blackout.sqlite`, separately from the
 Docker volume.
 
+## Evaluate with Jev
+
+Copy `.env.example` to `.env` if you have not already configured it, and set
+`JEV_API_KEY` there. Keep this file local. Only the backend uses the key.
+Request records and the browser do not contain it. `JEV_MODEL` defaults to the
+pinned `jev-1.13.0` model. Restart local processes after changing configuration,
+or run `docker compose up --build --wait` to recreate the services.
+
+1. Choose a fixture, check **Evaluate with Jev**, and start a run.
+2. Jev answers compromise probability (Noul), condition (Choice), severity (Score,
+   0–3), and advisory response (Choice) against one snapshot.
+3. In **Jev decisions**, select an attempt under **Decision Inspector**. Inspect
+   exact questions/state, distributions, timestamps, latency, and application
+   policy rules. Selecting an attempt holds the inspector while live state
+   continues above it. The address preserves the selected run and attempt.
+4. Reopen the saved run at any time. Inspection makes no new API calls.
+
+Default checkpoints occur at 0, 5, 10, … simulation seconds and the terminal
+snapshot. Each request has a 15-second wall timeout and at most one retry after
+one second. The simulation waits at each checkpoint, then resumes after success
+or a recorded failure. A 30-second run uses 7 requests, at most 14 with retries.
+A 120-second run uses at most 50.
+
+Missing credentials produce **Unavailable**
+attempts. The last successful decision remains visible with its age. Missing
+decisions mean unknown risk.
+
+An incident advisory requires compromise probability ≥ 0.8, classification
+`compromise`, classification confidence ≥ 0.75, and severity ≥ 2. These are
+provisional application rules, not validated detection thresholds. Missing
+required fields make policy unevaluable.
+
+Actions are advisory. The application
+does not contain or remediate threats. Confidence is distribution concentration, not measured
+correctness. Noul has no separate confidence field.
+
+## Measure the first model slice
+
+With the backend running and its Jev key configured:
+
+```bash
+npm run evaluate -- --smoke # One 6-second attack run; up to 6 requests
+npm run evaluate           # Three seeds × three fixtures; up to 90 requests
+```
+
+The full suite uses `m3-001`, `m3-002`, and `m3-003` across baseline, credential
+attack, and harmless anomaly, with 20 simulation seconds per run. The command
+prints the budget for the backend's actual configuration. It keeps every run
+and saves a report in the backend database plus `data/evaluations/<report-id>.json`.
+Open **Model evaluation reports** and choose **Refresh reports** to inspect
+outcomes and follow links to exact decisions.
+
+Failures, misses, false incident decisions, classification changes, returned
+token usage, latency, and achieved speed stay visible with denominators. API
+failures exit nonzero after saving the report. A model miss is a measured outcome.
+Prior reports are never replaced. `BLACKOUT_API_URL` selects another backend.
+See [metric definitions and validation evidence](docs/JEV-EVALUATION.md).
+
+The September 17, 2026 follow-up suite returned 45/45 valid responses, with
+379 ms median latency and 478 ms p95. All three attack runs were policy-level
+misses. The six control runs produced zero incident advisories across 30
+checkpoints. These results do not establish detection effectiveness.
+The [saved report](docs/evaluations/m3-follow-up-suite.json) preserves every outcome.
+
 ## Frameworks
 
 - **Web:** Next.js App Router, React, TypeScript, Tailwind CSS.
 - **Backend:** Fastify, WebSockets, SQLite through `better-sqlite3`.
 - **Shared contracts:** Zod schemas and inferred TypeScript types.
 - **Checks:** Vitest, Playwright, ESLint, Prettier, GitHub Actions.
-- **Workspace:** npm workspaces; one long-running backend owns SQLite.
+- **Workspace:** npm workspaces. One long-running backend owns SQLite.
 
 ```text
 apps/web/            Next.js console and styles
@@ -98,12 +170,12 @@ Defaults work without an environment file. To customize local development:
 cp .env.example .env
 ```
 
-The root scripts load `.env`; restart the processes after changing it. Configure
+The root scripts load `.env`. Restart the processes after changing it. Configure
 the backend address, allowed browser origin, database path, and log level there.
 Compose sets its service environment in `compose.yaml`.
 
 See [development setup](docs/DEVELOPMENT.md#configuration) for each variable and
-its default. Keep credentials in server-side configuration; the browser-visible
+its default. Keep credentials in server-side configuration. The browser-visible
 backend URL is public.
 
 ## Validation and production builds
@@ -135,5 +207,5 @@ storage behavior.
 - [Full MVP roadmap: milestones M1–M9 and acceptance criteria](docs/MVP-ROADMAP.md)
 - [Published GitHub tickets and blocking dependencies](docs/MVP-TICKETS.md)
 
-The next milestone, M3, adds real Jev evaluation and a Decision Inspector.
+The next milestone, M4, adds the complete credential-compromise scenario.
 The full MVP requires milestones M1–M9.

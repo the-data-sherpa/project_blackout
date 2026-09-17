@@ -139,6 +139,7 @@ export const observableSnapshotSchema = z.strictObject({
   runId: z.uuid(),
   simulationTimeMs: z.number().int().nonnegative(),
   input: evaluatorInputSchema,
+  recordedAt: z.iso.datetime().optional(),
 });
 export const scenarioTruthSchema = z.strictObject({
   runId: z.uuid(),
