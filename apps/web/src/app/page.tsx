@@ -1,4 +1,5 @@
 import { ConnectionStatus } from "./connection-status";
+import { RunConsole } from "./run-console";
 
 export const dynamic = "force-dynamic";
 
@@ -13,25 +14,9 @@ export default function Home() {
           Local environment
         </span>
       </header>
-      <section className="py-16 sm:py-24" aria-labelledby="page-title">
-        <p className="mb-4 font-mono text-xs uppercase tracking-widest text-emerald-300">
-          Development foundation
-        </p>
-        <h1
-          id="page-title"
-          className="max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl"
-        >
-          The console starts here.
-        </h1>
-        <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-300">
-          BLACKOUT will let you inspect how Jev decisions change as synthetic
-          security telemetry evolves.
-        </p>
-        <p className="mt-4 max-w-xl leading-relaxed text-slate-400">
-          This setup verifies the local services. Simulation controls,
-          recordings, and live Jev decisions are still to come.
-        </p>
-      </section>
+      <RunConsole
+        backendUrl={process.env.PUBLIC_BACKEND_URL ?? "http://localhost:3001"}
+      />
       <ConnectionStatus
         backendUrl={process.env.PUBLIC_BACKEND_URL ?? "http://localhost:3001"}
       />

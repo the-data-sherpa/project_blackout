@@ -2,10 +2,10 @@
 
 ## Scope
 
-This foundation boots the web app and backend, opens persistent SQLite storage,
-validates transport payloads, and verifies HTTP and WebSocket connectivity. It
-does not implement runs, telemetry generation, recording schemas, simulation
-controls, or Jev evaluation. No MVP ticket is complete from this setup alone.
+The app starts seeded runs, records a minimal authentication stream, and exposes
+the saved events, clock, manifest, and command log in the console. The first
+ticket's bounded run completes automatically. Attack controls, full organization
+generation, and Jev evaluation belong to later tickets.
 
 ## Workspace
 
@@ -17,8 +17,8 @@ controls, or Jev evaluation. No MVP ticket is complete from this setup alone.
 | `tests/e2e`          | Playwright checks against the built apps                                         |
 
 Keep credentials, database access, scenario truth, and model calls in the backend.
-Add shared transport contracts only when both sides need them. The current schemas
-cover health and connection readiness; domain contracts arrive with their features.
+Add shared transport contracts only when both sides need them. Schemas cover
+health, connection readiness, start requests, recordings, and run updates.
 
 The backend uses standard TypeScript compilation with Node ESM imports. Relative
 backend imports use `.js` extensions. Shared contracts compile before either app;
@@ -27,8 +27,9 @@ and the process supervisor is needed at this size.
 
 Fastify provides HTTP routing, lifecycle hooks, in-process request tests, and a
 WebSocket plugin in one server. SQLite uses `better-sqlite3`, with WAL, foreign
-keys, and a five-second busy timeout. Recording tables and versioned migrations
-belong to M1; the foundation does not invent a run schema.
+keys, and a five-second busy timeout. Schema version 1 adds run, command, and event
+tables in one migration, tracked by `PRAGMA user_version`. A newer, unsupported
+database version fails startup rather than being rewritten.
 
 TypeScript is pinned to 6.0.3, within the installed TypeScript ESLint parser's
 supported range. Node 24 LTS is pinned across local setup, CI, and Docker; use the
@@ -56,7 +57,8 @@ Open `http://localhost:3000` (use this hostname to match the allowed browser ori
 The backend listens at `http://localhost:3001`. `GET /api/health` checks SQLite;
 `/ws` sends a versioned `connection.ready` greeting. Browser WebSockets must use
 the configured web origin. The browser validates both responses and can retry a
-failed check. These checks neither generate telemetry nor call a model.
+failed check. These checks neither generate telemetry nor call a model. The
+separate **Start run** form begins generation.
 
 `npm run dev` stops the other processes if one exits. Ctrl+C closes the backend
 and its database. `npm run build` followed by `npm start` runs the production build.
@@ -93,15 +95,77 @@ npm run test:e2e
 ```
 
 Vitest covers runtime contracts, HTTP readiness, WebSocket origin checks, invalid
-configuration, foreign keys, and SQLite persistence across reopen. Playwright
+configuration, foreign keys, deterministic steps under irregular scheduling,
+same-time event ordering, write rollback, committed stream delivery, cross-run
+isolation, and SQLite persistence across reopen. Playwright
 uses ports 3100/3101 and an in-memory database, leaving development data alone.
-It checks real backend connectivity, failures and retry, disconnection, keyboard
-access, and a narrow viewport. Build before running the browser tests.
+It checks start-to-inspect, same-seed runs, recording reload, storage errors,
+backend connectivity, retry, disconnection, keyboard access, and a narrow
+viewport. Build before running the browser tests.
 
 `npm run test:watch` watches tests; `npm run format` formats source and tooling.
 The existing planning documents and local review artifacts are excluded from
 formatting. GitHub Actions runs the checks, production build, browser tests, and
 a separate Compose startup check.
+
+## Seeded run recording
+
+The first slice has three synthetic users, two workstations, and three resources.
+It generates two authentication events at each whole simulation second. Success
+and occasional failure are observations; a failure is not a hidden attack label.
+The larger organization and baseline profiles arrive with ticket #3.
+
+The manifest records the seed, initial entity lists, fixed simulation origin,
+duration, step size, and schema/generator/scenario versions. Policy, evaluator,
+requested-model, and resolved-model fields are explicitly null until used.
+The generator derives randomness from the version, seed, and event sequence; it
+does not consume shared randomness or wall-clock time. The simulation origin is
+`2026-01-01T09:00:00.000Z`, independently of the wall-clock creation date.
+
+Each delivered timer callback advances exactly 1,000 simulation milliseconds.
+Late callbacks slow progression; they cannot skip steps or change event order.
+The first events are at 1,000 ms, and the final pair is at the selected duration.
+Sequence numbers start at 1 within each run and break same-time ties. Run UUIDs
+and creation/completion wall times differ between executions. Comparing the
+observable stream across runs excludes only the enclosing run UUID.
+
+A start command records simulation time zero, command sequence 1, and its
+wall-clock acceptance time. Duration is part of the manifest; completion is
+automatic and does not invent an operator command. Future controls will append
+their own simulation times and sequence numbers.
+
+The backend is the sole database writer; run only one backend per database file.
+A partial unique index also prevents two active rows. Starting a run atomically
+saves its manifest and start command before returning HTTP 201. Each later
+transaction saves both events, the clock, and terminal status before publishing
+the WebSocket update. A write failure rolls back that entire step and stops
+generation. Failure status is saved if storage permits; `recording.error` reports
+the failure even if that status cannot be saved. The frontend retains only saved
+events and shows the error. Check storage and restart the backend before retrying.
+
+SQLite uses WAL with `synchronous=FULL`. Successful commits are the durability
+boundary, subject to the filesystem and device honoring SQLite's sync requests.
+`:memory:` databases are temporary and are used by isolated automated tests.
+Clean shutdown and startup mark unfinished runs interrupted without resuming
+generation. A saved run remains accessible through its URL. Comprehensive
+process-termination tests and the stored-run list are ticket #2.
+
+| API                    | Behavior                                                                                                                                                                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/runs`       | Strict JSON `{ "seed": "demo", "durationSeconds": 30 }`; seed is 1–128 trimmed characters, duration is an integer from 1–120 (default 30). Returns the committed recording with HTTP 201. |
+| `GET /api/runs/active` | Returns `{ "runId": "…" }` or `{ "runId": null }`.                                                                                                                                        |
+| `GET /api/runs/:id`    | Returns the manifest, status, clock, ordered events, and ordered commands from SQLite.                                                                                                    |
+| `GET /ws?runId=<uuid>` | Sends `connection.ready`, a full saved `run.snapshot`, then committed `run.updated` event batches or `recording.error`. Omitting `runId` gives only the connection check.                 |
+
+Malformed requests return HTTP 400, a second active run returns 409, missing
+recordings return 404, and storage failures return 503. Unknown request fields
+are rejected, including credentials. The recorder accepts only defined domain
+fields and never copies process environment or HTTP headers into a manifest.
+
+Run sockets carry only their selected run. On refresh, the full snapshot closes
+the gap between the HTTP read and socket subscription. Automatic reconnection
+and broader recovery controls belong to ticket #18. Slow clients are disconnected
+when their outbound buffer exceeds 1 MiB and can reload the saved recording.
 
 ## Docker
 
