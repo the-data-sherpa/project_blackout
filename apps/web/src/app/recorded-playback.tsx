@@ -221,6 +221,7 @@ export function RecordedPlayback({
       <RunInspection
         recording={projected}
         connected={false}
+        activityAnimation={playing}
         readOnly={
           cursorMs !== index.endMs || recording.run.derivation !== undefined
         }

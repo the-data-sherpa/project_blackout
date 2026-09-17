@@ -44,12 +44,22 @@ function EventTable({
   events,
   label,
   testId = "event-row",
+  selectedSequence = null,
+  onSelect,
 }: {
   events: ObservableEvent[];
   label: string;
   testId?: string;
+  selectedSequence?: number | null;
+  onSelect?: (sequence: number) => void;
 }) {
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(() => {
+    if (selectedSequence === null) return 0;
+    const index = events.findIndex(
+      (event) => event.sequence === selectedSequence,
+    );
+    return index < 0 ? 0 : Math.floor(index / 50);
+  });
   const offset = Math.min(
     page * 50,
     Math.max(0, Math.ceil(events.length / 50) - 1) * 50,
@@ -111,7 +121,10 @@ function EventTable({
               <tr
                 key={event.sequence}
                 data-testid={testId}
-                className="border-t border-slate-800 align-top"
+                data-selected={
+                  selectedSequence === event.sequence ? "true" : undefined
+                }
+                className={`border-t border-slate-800 align-top ${selectedSequence === event.sequence ? "bg-cyan-950/40" : ""}`}
               >
                 <td className="px-3 py-3 font-mono text-xs">
                   <span className="block">#{event.sequence}</span>
@@ -147,6 +160,16 @@ function EventTable({
                 </td>
                 <td className="max-w-xs px-3 py-3 text-xs">
                   <p className="break-words">{describe(event)}</p>
+                  {onSelect && (
+                    <button
+                      type="button"
+                      aria-pressed={selectedSequence === event.sequence}
+                      className="mt-2 min-h-11 text-cyan-200 underline underline-offset-4"
+                      onClick={() => onSelect(event.sequence)}
+                    >
+                      Inspect event #{event.sequence}
+                    </button>
+                  )}
                   <details className="mt-2">
                     <summary className="min-h-8 cursor-pointer text-emerald-300">
                       Raw event #{event.sequence}
@@ -169,14 +192,21 @@ export function TelemetryInspector({
   recording,
   backendUrl,
   decisionId = null,
+  selectedEntityId = null,
+  selectedEventSequence = null,
+  onEntitySelect,
+  onEventSelect,
 }: {
   recording: Recording;
   backendUrl: string;
   decisionId?: string | null;
+  selectedEntityId?: string | null;
+  selectedEventSequence?: number | null;
+  onEntitySelect: (id: string | null) => void;
+  onEventSelect: (sequence: number | null) => void;
 }) {
   const [phase, setPhase] = useState("live");
   const [kind, setKind] = useState("all");
-  const [entity, setEntity] = useState("all");
   const [identity, setIdentity] = useState("");
   const [hostId, setHostId] = useState("");
   const [snapshotId, setSnapshotId] = useState("latest");
@@ -191,6 +221,19 @@ export function TelemetryInspector({
   const manifest = recording.run.manifest;
   const organization =
     manifest.schemaVersion === 2 ? manifest.organization : null;
+  const entity = selectedEntityId ?? "all";
+  const selectedEvent =
+    selectedEventSequence === null
+      ? undefined
+      : recording.events.find(
+          (event) => event.sequence === selectedEventSequence,
+        );
+  const visiblePhase = selectedEvent
+    ? selectedEvent.simulationTimeMs < 0
+      ? "warmup"
+      : "live"
+    : phase;
+  const visibleKind = selectedEvent ? "all" : kind;
   const profile =
     organization?.users.find((user) => user.userId === identity) ??
     organization?.users[0];
@@ -218,24 +261,34 @@ export function TelemetryInspector({
   const evidence = recording.events.filter((event) =>
     references.has(event.sequence),
   );
-  const events = recording.events.filter(
-    (event) =>
+  const events = recording.events.filter((event) => {
+    const selectedResource = organization?.resources.find(
+      (resource) => resource.id === entity,
+    );
+    const matchesEntity =
+      entity === "all" ||
+      event.hostId === entity ||
+      ("userId" in event && event.userId === entity) ||
+      (event.type === "network" && event.destinationHostId === entity) ||
+      (event.type === "authentication" && event.resource === entity) ||
+      (event.type === "dns" &&
+        selectedResource !== undefined &&
+        event.query === selectedResource.domain);
+    return (
       (!decisionId || !!selectedDecision) &&
       event.simulationTimeMs <=
         (snapshot?.simulationTimeMs ?? recording.run.simulationTimeMs) &&
-      (phase === "all" ||
-        (phase === "warmup"
+      (visiblePhase === "all" ||
+        (visiblePhase === "warmup"
           ? event.simulationTimeMs < 0
           : event.simulationTimeMs >= 0)) &&
-      (kind === "all" || event.type === kind) &&
-      (entity === "all" ||
-        event.hostId === entity ||
-        ("userId" in event && event.userId === entity) ||
-        (event.type === "network" && event.destinationHostId === entity)),
-  );
-
+      (visibleKind === "all" || event.type === visibleKind) &&
+      matchesEntity
+    );
+  });
   function inspectHistory(id: string) {
-    setEntity(id);
+    onEntitySelect(id);
+    onEventSelect(null);
     setPhase("warmup");
     setKind("all");
     document.getElementById("events-title")?.focus();
@@ -556,8 +609,11 @@ export function TelemetryInspector({
             <select
               className={`${control} mt-2 block w-full`}
               name="period"
-              value={phase}
-              onChange={(event) => setPhase(event.target.value)}
+              value={visiblePhase}
+              onChange={(event) => {
+                onEventSelect(null);
+                setPhase(event.target.value);
+              }}
             >
               <option value="live">Live activity (0 s onward)</option>
               <option value="warmup">Warm-up history (before 0 s)</option>
@@ -569,8 +625,11 @@ export function TelemetryInspector({
             <select
               className={`${control} mt-2 block w-full`}
               name="event-type"
-              value={kind}
-              onChange={(event) => setKind(event.target.value)}
+              value={visibleKind}
+              onChange={(event) => {
+                onEventSelect(null);
+                setKind(event.target.value);
+              }}
             >
               <option value="all">All types</option>
               {["authentication", "host-metric", "dns", "network"].map(
@@ -586,11 +645,18 @@ export function TelemetryInspector({
               className={`${control} mt-2 block w-full`}
               name="entity"
               value={entity}
-              onChange={(event) => setEntity(event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value;
+                onEventSelect(null);
+                onEntitySelect(value === "all" ? null : value);
+              }}
             >
               <option value="all">All entities</option>
               {manifest.initialState.users
-                .concat(manifest.initialState.hosts)
+                .concat(
+                  manifest.initialState.hosts,
+                  organization?.resources.map((resource) => resource.id) ?? [],
+                )
                 .map((id) => (
                   <option key={id}>{id}</option>
                 ))}
@@ -598,9 +664,11 @@ export function TelemetryInspector({
           </label>
         </div>
         <EventTable
-          key={`${entity}:${phase}:${kind}`}
+          key={`${entity}:${visiblePhase}:${visibleKind}:${selectedEventSequence ?? "none"}`}
           events={events}
           label="Recorded telemetry events"
+          selectedSequence={selectedEventSequence}
+          onSelect={onEventSelect}
         />
       </section>
 

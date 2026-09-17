@@ -1,6 +1,6 @@
 # PROJECT: BLACKOUT — Full MVP Roadmap
 
-Status: M1–M7 implemented; M8–M9 remain. See [M7 playback, seeking, reruns and reevaluation](M7-PLAYBACK.md).
+Status: M1–M8 implemented; M9 remains. See [M8 evidence topology and complete console](M8-TOPOLOGY.md).
 Decision baseline: PRD review accepted by the owner on 2026-09-17.  
 Product specification: [PRD](PRD.md).  
 Implementation backlog: [31 approved GitHub tickets across M1–M9](MVP-TICKETS.md).

@@ -6,11 +6,11 @@ and saved recordings, with observable evidence kept separate from scenario truth
 
 ## Current status
 
-M1–M6 are implemented, including the decision timeline, correlated evidence,
-investigation history, interactive controls and saved Jev reports.
-The console starts a seeded 32-user, 16-host
-organization with 15 minutes of recorded baseline history. It streams authentication,
-host metrics, DNS and network events, and records five rolling windows with
+M1–M8 are implemented, including recorded playback, correlated decision and
+event inspection, interactive controls, saved Jev reports and the evidence-based
+environment topology. The console starts a seeded 32-user, 16-host organization
+with 15 minutes of recorded baseline history. It streams authentication, host
+metrics, DNS and network events, and records five rolling windows with
 inspectable evidence and a focus identity chosen from observed activity.
 
 Choose baseline, the full credential-compromise sequence, or benign maintenance
@@ -27,6 +27,8 @@ See the [M3 evaluator and measurement guide](docs/JEV-EVALUATION.md).
 See the [M4 scenarios, schedule and evaluation](docs/M4-SCENARIOS.md).
 See the [M5 controls, timing and reconnect guide](docs/M5-CONTROLS.md).
 See the [M6 decision console and investigation guide](docs/M6-CONSOLE.md).
+See the [M7 playback, seeking, rerun and reevaluation guide](docs/M7-PLAYBACK.md).
+See the [M8 evidence topology and complete console guide](docs/M8-TOPOLOGY.md).
 
 ## Quick start with Docker
 
@@ -261,9 +263,10 @@ storage behavior.
 - [Full MVP roadmap: milestones M1–M9 and acceptance criteria](docs/MVP-ROADMAP.md)
 - [Published GitHub tickets and blocking dependencies](docs/MVP-TICKETS.md)
 
-M7 recorded playback, temporal seeking, deterministic telemetry reruns and fresh
-model reevaluation are implemented. The [M7 guide](docs/M7-PLAYBACK.md) records
-the interfaces, measured seek behavior and real Jev sample.
+M8 evidence-based topology, rule-derived entity highlighting, playback
+synchronization and sustained-load console budgets are implemented. The
+[M8 guide](docs/M8-TOPOLOGY.md) records the rule, selection behavior and measured
+browser budgets.
 
-The next milestone, M8, adds evidence-based topology and the finished console
-experience. The full MVP requires milestones M1–M9.
+The next milestone, M9, packages and verifies the full MVP. The full MVP requires
+milestones M1–M9.
