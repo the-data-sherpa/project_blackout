@@ -75,6 +75,9 @@ export function createTelemetryManifest(input: StartRun): TelemetryManifest {
     seed: input.seed,
     durationSeconds: input.durationSeconds,
     fixture: input.fixture,
+    ...(input.interactive
+      ? { interactive: true, interactiveScenarioVersion: "scenarios/1" }
+      : {}),
     simulationOrigin: "2026-01-01T09:00:00.000Z",
     tickMs: 1000,
     initialState: {

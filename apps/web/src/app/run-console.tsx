@@ -8,7 +8,6 @@ import {
   apiErrorSchema,
   recordingSchema,
   runIdSchema,
-  serverMessageSchema,
   startRunSchema,
   type Recording,
 } from "@blackout/contracts";
@@ -16,6 +15,8 @@ import { RunBrowser } from "./run-browser";
 import { TelemetryInspector } from "./telemetry-inspector";
 import { DecisionInspector } from "./decision-inspector";
 import { EvaluationReports } from "./evaluation-reports";
+import { useRunStream } from "./use-run-stream";
+import { RunControls } from "./run-controls";
 
 const buttonClass =
   "min-h-11 rounded border border-slate-500 px-4 py-2 text-sm hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-60";
@@ -29,6 +30,7 @@ const statusLabels = {
 export function RunConsole({ backendUrl }: { backendUrl: string }) {
   const [fixture, setFixture] = useState<Fixture>("baseline");
   const [evaluate, setEvaluate] = useState(false);
+  const [interactive, setInteractive] = useState(false);
   const [seed, setSeed] = useState("blackout-demo-001");
   const [duration, setDuration] = useState("30");
   const [runId, setRunId] = useState<string | null>(null);
@@ -80,155 +82,25 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
     };
   }, [backendUrl, setupAttempt]);
 
-  useEffect(() => {
-    if (!runId) return;
-    let disposed = false;
-    let socket: WebSocket | undefined;
-    let terminal = false;
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => {
-      controller.abort();
-      socket?.close();
-    }, 5000);
-
-    async function connect() {
-      setStream("Connecting");
-      try {
-        const response = await fetch(
-          new URL(`/api/runs/${runId}`, backendUrl),
-          { signal: controller.signal, cache: "no-store" },
-        );
-        if (!response.ok)
-          throw new Error(apiErrorSchema.parse(await response.json()).message);
-        const saved = recordingSchema.parse(await response.json());
-        if (disposed) return;
-        setRecording(saved);
-        if (saved.run.status !== "running") {
-          window.clearTimeout(timeout);
-          setStream("Recorded");
-          return;
-        }
-        const url = new URL("/ws", backendUrl);
-        url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-        url.searchParams.set("runId", runId!);
-        socket = new WebSocket(url);
-        socket.onmessage = (event: MessageEvent<string>) => {
-          if (disposed) return;
-          try {
-            const message = serverMessageSchema.parse(JSON.parse(event.data));
-            if (message.type === "connection.ready") return;
-            window.clearTimeout(timeout);
-            if (message.type === "recording.error") {
-              if (message.runId === runId) setError(message.message);
-              return;
-            }
-            if (message.type === "inference.updated") {
-              if (message.runId !== runId) throw new Error("Unexpected run");
-              setRecording((previous) =>
-                !previous || previous.run.id !== runId
-                  ? previous
-                  : {
-                      ...previous,
-                      attempts: [
-                        ...previous.attempts.filter(
-                          (item) => item.id !== message.attempt.id,
-                        ),
-                        message.attempt,
-                      ].sort(
-                        (a, b) =>
-                          a.simulationTimeMs - b.simulationTimeMs ||
-                          a.attemptNumber - b.attemptNumber,
-                      ),
-                    },
-              );
-              return;
-            }
-            const next =
-              message.type === "run.snapshot"
-                ? message.recording.run
-                : message.run;
-            if (next.id !== runId) throw new Error("Unexpected run");
-            setStream("Connected");
-            if (next.status !== "running") {
-              terminal = true;
-              setActiveRunId((active) => (active === next.id ? null : active));
-              setStream("Recorded");
-              socket?.close();
-            }
-            setRecording((previous) => {
-              if (message.type === "run.snapshot") return message.recording;
-              if (
-                !previous ||
-                previous.run.id !== next.id ||
-                next.lastSequence < previous.run.lastSequence
-              )
-                return previous;
-              return {
-                ...previous,
-                run: next,
-                commands: [
-                  ...previous.commands,
-                  ...(message.commands ?? []).filter(
-                    (command) =>
-                      !previous.commands.some(
-                        (saved) => saved.sequence === command.sequence,
-                      ),
-                  ),
-                ],
-                snapshots:
-                  message.snapshot &&
-                  !previous.snapshots.some(
-                    (snapshot) => snapshot.id === message.snapshot!.id,
-                  )
-                    ? [...previous.snapshots, message.snapshot]
-                    : previous.snapshots,
-                events: [
-                  ...previous.events,
-                  ...message.events.filter(
-                    (item) => item.sequence > previous.run.lastSequence,
-                  ),
-                ],
-              };
-            });
-          } catch {
-            setError(
-              "Could not read live updates. Refresh the recording to load saved events.",
-            );
-            socket?.close();
-          }
-        };
-        socket.onclose = socket.onerror = () => {
-          window.clearTimeout(timeout);
-          if (!disposed && !terminal) setStream("Disconnected");
-        };
-      } catch (cause) {
-        if (!disposed) {
-          setStream("Disconnected");
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : "Could not load the recording.",
-          );
-        }
-        window.clearTimeout(timeout);
-      }
-    }
-    void connect();
-    return () => {
-      disposed = true;
-      controller.abort();
-      window.clearTimeout(timeout);
-      socket?.close();
-    };
-  }, [backendUrl, runId, attempt]);
+  useRunStream({
+    backendUrl,
+    runId,
+    attempt,
+    setRecording,
+    setStream,
+    setError,
+    setActiveRunId,
+  });
 
   async function start(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const input = startRunSchema.safeParse({
       seed,
       durationSeconds: Number(duration),
-      fixture,
+      fixture: interactive ? "baseline" : fixture,
       evaluate,
+      interactive,
+      commandId: crypto.randomUUID(),
     });
     if (!input.success) {
       setError(
@@ -339,11 +211,24 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
             {loading ? "Loading…" : "Start run"}
           </button>
         </div>
+        <label className="mt-4 flex min-h-11 items-center gap-3 text-sm text-slate-200">
+          <input
+            type="checkbox"
+            checked={interactive}
+            onChange={(event) => {
+              setInteractive(event.target.checked);
+              if (event.target.checked) setDuration("95");
+            }}
+            className="h-5 w-5"
+          />
+          Interactive mode — start normal, then begin and stop a scenario
+        </label>
         <label className="mt-4 block text-sm text-slate-300">
-          Comparison fixture
+          Comparison fixture (scheduled)
           <select
             className="mt-2 block min-h-11 w-full rounded border border-slate-500 bg-slate-950 px-3 text-slate-100"
             name="fixture"
+            disabled={interactive}
             value={fixture}
             onChange={(event) => {
               const selected = fixtureSchema.parse(event.target.value);
@@ -366,15 +251,16 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
             <option value="harmless-anomaly">Harmless anomaly</option>
           </select>
         </label>
-        {(fixture === "credential-compromise" ||
-          fixture === "benign-maintenance") && (
-          <p className="mt-3 text-sm text-slate-300">
-            Injection starts at 5 s and stops at 35 s. A 95-second run includes
-            60 seconds of continued baseline traffic after the stop. Shorter
-            runs contain only their elapsed stages. Scenario choice does not set
-            Jev’s judgment.
-          </p>
-        )}
+        {!interactive &&
+          (fixture === "credential-compromise" ||
+            fixture === "benign-maintenance") && (
+            <p className="mt-3 text-sm text-slate-300">
+              Injection starts at 5 s and stops at 35 s. A 95-second run
+              includes 60 seconds of continued baseline traffic after the stop.
+              Shorter runs contain only their elapsed stages. Scenario choice
+              does not set Jev’s judgment.
+            </p>
+          )}
         <label className="mt-4 flex min-h-11 items-center gap-3 text-sm text-slate-200">
           <input
             type="checkbox"
@@ -481,7 +367,9 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
             <div>
               <dt className="text-sm text-slate-400">Last saved status</dt>
               <dd role="status" className="mt-2 font-mono text-emerald-300">
-                {statusLabels[run.status]}
+                {run.status === "running" && run.controls?.paused
+                  ? "Paused"
+                  : statusLabels[run.status]}
               </dd>
             </div>
             <div>
@@ -502,6 +390,29 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               <dd className="mt-2 font-mono text-sm">{stream}</dd>
             </div>
           </dl>
+          <RunControls
+            key={`controls-${run.id}`}
+            recording={recording}
+            connected={stream === "Connected"}
+            canReset={
+              stream === "Connected" ||
+              (stream === "Recorded" && activeRunId === null)
+            }
+            backendUrl={backendUrl}
+            onSaved={(saved) => {
+              if (saved.run.id !== run.id) {
+                setRecording(saved);
+                selectRun(saved.run.id);
+                setActiveRunId(saved.run.id);
+              } else
+                setRecording((previous) =>
+                  previous?.run.id === saved.run.id &&
+                  previous.run.revision > saved.run.revision
+                    ? previous
+                    : saved,
+                );
+            }}
+          />
           {run.status !== "running" && (
             <p className="mb-5 text-sm text-slate-300">
               Viewing saved events. Opening this recording does not restart
@@ -516,14 +427,15 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
           )}
           {stream === "Disconnected" && (
             <p className="mb-5 text-sm text-amber-200">
-              Live updates disconnected. Refresh the recording to see the latest
-              saved state.
+              Live updates disconnected. Reconnecting automatically; controls
+              return after the saved state is synchronized.
             </p>
           )}
           {run.status === "interrupted" && (
             <p className="mb-5 text-sm text-amber-200">
-              The backend stopped before this run finished. These are its saved
-              events.
+              {run.endedReason === "reset"
+                ? "Reset ended this run. Its evidence and decisions are retained."
+                : "The backend stopped before this run finished. These are its saved events."}
             </p>
           )}
           <details className="mb-6 rounded border border-slate-600 p-4">

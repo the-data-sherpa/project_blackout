@@ -1,6 +1,6 @@
 # PROJECT: BLACKOUT — Full MVP Roadmap
 
-Status: M1–M4 implemented; M5–M9 remain. See [M4 scenarios, measurements and limitations](M4-SCENARIOS.md).
+Status: M1–M5 implemented; M6–M9 remain. See [M4 scenarios, measurements and limitations](M4-SCENARIOS.md).
 Decision baseline: PRD review accepted by the owner on 2026-09-17.  
 Product specification: [PRD](PRD.md).  
 Implementation backlog: [31 approved GitHub tickets across M1–M9](MVP-TICKETS.md).
@@ -164,6 +164,8 @@ Exit criteria:
 - No security-effectiveness or calibrated-confidence claim exceeds the evidence.
 
 ## M5 — Interactive controls and timing
+
+Implemented. See the [controls and recovery guide](M5-CONTROLS.md) for behavior and validation.
 
 Deliver:
 

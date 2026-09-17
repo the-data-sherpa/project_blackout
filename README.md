@@ -6,7 +6,7 @@ and saved recordings, with observable evidence kept separate from scenario truth
 
 ## Current status
 
-M1–M4 are implemented, including the full scenario, benign control, and saved Jev reports.
+M1–M5 are implemented, including interactive controls, reconnect recovery, the full scenario, benign control, and saved Jev reports.
 The console starts a seeded 32-user, 16-host
 organization with 15 minutes of recorded baseline history. It streams authentication,
 host metrics, DNS and network events, and records five rolling windows with
@@ -24,6 +24,7 @@ API failures stay visible and do not become low-risk decisions.
 See the [M2 walkthrough and state rules](docs/OBSERVABLE-STATE.md).
 See the [M3 evaluator and measurement guide](docs/JEV-EVALUATION.md).
 See the [M4 scenarios, schedule and evaluation](docs/M4-SCENARIOS.md).
+See the [M5 controls, timing and reconnect guide](docs/M5-CONTROLS.md).
 
 ## Quick start with Docker
 
@@ -84,6 +85,20 @@ mise exec -- npm run dev
 Stop Compose before starting local development: both use ports 3000 and 3001.
 Local development stores SQLite at `data/blackout.sqlite`, separately from the
 Docker volume.
+
+## Control an interactive run
+
+Select **Interactive mode**, enter a seed and duration, then **Start run**.
+Choose a scenario and **Begin Attack** or **Begin Control**. **Pause** freezes
+simulation time and live decisions while preserving inspection. **Resume** applies
+held Jev results before continuing. **Stop Attack** ends injection while baseline
+traffic and existing evidence remain.
+
+Requested speeds range from 0.25× to 5×. The console shows achieved progress and
+inference waits; evaluation checkpoints are never skipped. **Reset run** starts
+the same seed from zero and retains the previous recording. Reconnect is automatic
+and restores controls from the saved state. See the
+[M5 walkthrough and API](docs/M5-CONTROLS.md).
 
 ## Evaluate with Jev
 
@@ -231,5 +246,5 @@ storage behavior.
 - [Full MVP roadmap: milestones M1–M9 and acceptance criteria](docs/MVP-ROADMAP.md)
 - [Published GitHub tickets and blocking dependencies](docs/MVP-TICKETS.md)
 
-The next milestone, M5, adds interactive attack, pause/resume, speed and reconnect controls.
+The next milestone, M6, adds the decision timeline, filtered evidence and incident lifecycle.
 The full MVP requires milestones M1–M9.

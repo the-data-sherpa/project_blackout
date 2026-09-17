@@ -4,6 +4,7 @@ import websocket from "@fastify/websocket";
 import { z } from "zod";
 import {
   activeRunSchema,
+  controlRunSchema,
   apiErrorSchema,
   healthSchema,
   recordingSchema,
@@ -29,7 +30,7 @@ type AppOptions = {
 };
 
 function scheduleTicks(tick: () => void) {
-  const timer = setInterval(tick, 1000);
+  const timer = setInterval(tick, 25);
   timer.unref();
   return () => clearInterval(timer);
 }
@@ -60,7 +61,9 @@ export async function buildApp(options: AppOptions) {
   try {
     const service = new Runs(new Recordings(database), options.evaluator);
     runs = service;
-    stopTicks = (options.schedule ?? scheduleTicks)(() => service.tick());
+    stopTicks = options.schedule
+      ? options.schedule(() => service.tick())
+      : scheduleTicks(() => service.pulse());
     await app.register(cors, { origin: options.webOrigin });
     await app.register(websocket, { options: { maxPayload: 16 * 1024 } });
 
@@ -80,7 +83,7 @@ export async function buildApp(options: AppOptions) {
       }
       if (error instanceof RunError) {
         return reply
-          .code(error.code === "run_active" ? 409 : 503)
+          .code(error.code === "recording_unavailable" ? 503 : 409)
           .send(
             apiErrorSchema.parse({ code: error.code, message: error.message }),
           );
@@ -98,6 +101,14 @@ export async function buildApp(options: AppOptions) {
     app.post("/api/runs", async (request, reply) => {
       const recording = service.start(parseInput(startRunSchema, request.body));
       return reply.code(201).send(recordingSchema.parse(recording));
+    });
+
+    app.post("/api/runs/:id/commands", async (request) => {
+      const { id } = parseInput(
+        z.strictObject({ id: runIdSchema }),
+        request.params,
+      );
+      return service.control(id, parseInput(controlRunSchema, request.body));
     });
 
     app.get("/api/evaluator", async () => ({
@@ -130,13 +141,18 @@ export async function buildApp(options: AppOptions) {
             !recording ||
             recording.run.status !== "completed" ||
             recording.run.manifest.schemaVersion !== 2 ||
+            recording.run.manifest.interactive ||
+            recording.commands.some(
+              (command) => command.request && command.type === "stop-injection",
+            ) ||
             !recording.run.manifest.evaluation,
         )
       )
         return reply.code(400).send(
           apiErrorSchema.parse({
             code: "invalid_input",
-            message: "Select completed Jev-evaluated runs for the report.",
+            message:
+              "Select completed, scheduled Jev-evaluated runs for the report. Interactive runs have operator-defined timing.",
           }),
         );
       const report = createEvaluationReport(

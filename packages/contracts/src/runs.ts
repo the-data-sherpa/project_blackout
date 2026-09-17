@@ -12,15 +12,55 @@ import {
   scenarioPlanSchema,
 } from "./telemetry.js";
 
+export const speedSchema = z.union([
+  z.literal(0.25),
+  z.literal(0.5),
+  z.literal(1),
+  z.literal(2),
+  z.literal(5),
+]);
+export const interactiveFixtureSchema = z.enum([
+  "credential-compromise",
+  "benign-maintenance",
+]);
+export const controlRunSchema = z.discriminatedUnion("type", [
+  z.strictObject({ commandId: z.uuid(), type: z.literal("pause") }),
+  z.strictObject({ commandId: z.uuid(), type: z.literal("resume") }),
+  z.strictObject({ commandId: z.uuid(), type: z.literal("reset") }),
+  z.strictObject({ commandId: z.uuid(), type: z.literal("stop-injection") }),
+  z.strictObject({
+    commandId: z.uuid(),
+    type: z.literal("begin-injection"),
+    fixture: interactiveFixtureSchema,
+  }),
+  z.strictObject({
+    commandId: z.uuid(),
+    type: z.literal("set-speed"),
+    speed: speedSchema,
+  }),
+]);
+
 export const startRunSchema = z
   .strictObject({
     seed: z.string().trim().min(1).max(128),
     durationSeconds: z.number().int().min(1).max(120).default(30),
     fixture: fixtureSchema.default("baseline"),
     evaluate: z.boolean().default(false),
+    interactive: z.boolean().default(false),
+    commandId: z.uuid().optional(),
     stopInjectionAtSeconds: z.number().int().min(1).max(35).optional(),
   })
   .superRefine((input, context) => {
+    if (
+      input.interactive &&
+      (input.fixture !== "baseline" ||
+        input.stopInjectionAtSeconds !== undefined)
+    )
+      context.addIssue({
+        code: "custom",
+        message:
+          "Interactive runs start in normal mode; use Begin Attack or Begin Control to inject a scenario",
+      });
     if (
       input.stopInjectionAtSeconds !== undefined &&
       ((input.fixture !== "credential-compromise" &&
@@ -68,6 +108,8 @@ export const telemetryManifestSchema = legacyManifestSchema
     scenario: scenarioPlanSchema.optional(),
     evaluation: evaluationConfigSchema.optional(),
     policy: policyConfigSchema.optional(),
+    interactive: z.boolean().optional(),
+    interactiveScenarioVersion: z.literal("scenarios/1").optional(),
   })
   .superRefine((manifest, context) => {
     const fullScenario =
@@ -96,6 +138,26 @@ export const runSchema = z.strictObject({
   lastSequence: z.number().int().nonnegative(),
   createdAt: z.iso.datetime(),
   endedAt: z.iso.datetime().nullable(),
+  revision: z.number().int().nonnegative().default(0),
+  controls: z
+    .strictObject({
+      paused: z.boolean(),
+      pausedAttemptId: z.uuid().nullable().optional(),
+      requestedSpeed: speedSchema,
+      waitingForInference: z.boolean(),
+      pendingApplication: z.boolean(),
+      elapsedWallMs: z.number().nonnegative(),
+      injection: z
+        .strictObject({
+          fixture: interactiveFixtureSchema,
+          startedAtMs: simulationTimeSchema,
+          stoppedAtMs: simulationTimeSchema.nullable(),
+        })
+        .nullable(),
+    })
+    .optional(),
+  endedReason: z.enum(["reset", "shutdown", "storage-failure"]).optional(),
+  replacementRunId: runIdSchema.optional(),
 });
 
 export const runListQuerySchema = z.strictObject({
@@ -132,8 +194,23 @@ export const commandSchema = z.strictObject({
   sequence: z.number().int().positive(),
   simulationTimeMs: simulationTimeSchema,
   recordedAt: z.iso.datetime(),
-  type: z.enum(["start", "begin-injection", "stop-injection"]),
-  parameters: z.strictObject({ fixture: fixtureSchema }).optional(),
+  type: z.enum([
+    "start",
+    "begin-injection",
+    "stop-injection",
+    "pause",
+    "resume",
+    "reset",
+    "set-speed",
+  ]),
+  parameters: z
+    .strictObject({
+      fixture: fixtureSchema.optional(),
+      speed: speedSchema.optional(),
+    })
+    .optional(),
+  request: z.union([controlRunSchema, startRunSchema]).optional(),
+  resultRunId: runIdSchema.optional(),
 });
 
 export const observableEventSchema = z.union([
@@ -158,6 +235,8 @@ export const apiErrorSchema = z.strictObject({
     "run_active",
     "not_found",
     "recording_unavailable",
+    "invalid_transition",
+    "command_conflict",
   ]),
   message: z.string(),
 });
@@ -166,6 +245,7 @@ export const runMessageSchema = z.discriminatedUnion("type", [
   z.strictObject({
     type: z.literal("inference.updated"),
     runId: runIdSchema,
+    run: runSchema,
     attempt: inferenceAttemptSchema,
   }),
   z.strictObject({
@@ -178,6 +258,7 @@ export const runMessageSchema = z.discriminatedUnion("type", [
     events: z.array(observableEventSchema),
     snapshot: observableSnapshotSchema.optional(),
     commands: z.array(commandSchema).optional(),
+    attempts: z.array(inferenceAttemptSchema).optional(),
   }),
   z.strictObject({
     type: z.literal("recording.error"),
@@ -187,6 +268,7 @@ export const runMessageSchema = z.discriminatedUnion("type", [
 ]);
 
 export type StartRun = z.infer<typeof startRunSchema>;
+export type ControlRun = z.infer<typeof controlRunSchema>;
 export type RunManifest = z.infer<typeof manifestSchema>;
 export type Run = z.infer<typeof runSchema>;
 export type RunList = z.infer<typeof runListSchema>;

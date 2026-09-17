@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
 import {
+  controlRunSchema,
   runMessageSchema,
   startRunSchema,
+  type InferenceAttempt,
   type Run,
+  type RunCommand,
   type RunMessage,
+  type StartRun,
   type TelemetryEvent,
   type ObservableSnapshot,
 } from "@blackout/contracts";
@@ -15,7 +19,7 @@ import {
   orderObservations,
 } from "./telemetry.js";
 import { fixtureObservations } from "./fixtures.js";
-import { scheduledCommands } from "./scenarios.js";
+import { createScenarioPlan, scheduledCommands } from "./scenarios.js";
 import { createSnapshot } from "./aggregation.js";
 import { Recordings } from "./recordings.js";
 import {
@@ -27,7 +31,11 @@ import { evaluatePolicy } from "./policy.js";
 
 export class RunError extends Error {
   constructor(
-    readonly code: "run_active" | "recording_unavailable",
+    readonly code:
+      | "run_active"
+      | "recording_unavailable"
+      | "invalid_transition"
+      | "command_conflict",
     message: string,
   ) {
     super(message);
@@ -40,7 +48,9 @@ export class Runs {
   private readonly listeners = new Set<(message: RunMessage) => void>();
   private readonly evaluator: Evaluator;
   private pending: Promise<void> | null = null;
+  private readonly outstanding = new Set<Promise<void>>();
   private controller = new AbortController();
+  private nextTickAt = 0;
   private failure: Extract<RunMessage, { type: "recording.error" }> | null =
     null;
 
@@ -49,7 +59,6 @@ export class Runs {
     options: EvaluatorOptions = {},
   ) {
     this.evaluator = new Evaluator(options);
-    // This process never silently resumes a prior process's simulation.
     this.interrupt();
   }
 
@@ -59,22 +68,33 @@ export class Runs {
       this.listeners.delete(listener);
     };
   }
-
   get recordingFailure() {
     return this.failure;
   }
 
-  start(input: unknown) {
-    const parsed = startRunSchema.parse(input);
+  private available() {
     if (this.failure)
       throw new RunError("recording_unavailable", this.failure.message);
-    if (this.recordings.active())
+  }
+
+  private duplicate(input: { commandId?: string | undefined }, runId?: string) {
+    if (!input.commandId) return null;
+    const command = this.recordings.command(input.commandId);
+    if (!command) return null;
+    if (
+      (runId && command.runId !== runId) ||
+      JSON.stringify(command.request) !== JSON.stringify(input)
+    )
       throw new RunError(
-        "run_active",
-        "A run is already active. Wait for it to finish.",
+        "command_conflict",
+        "This command ID was already used for a different request.",
       );
-    const manifest = createTelemetryManifest(parsed);
-    if (parsed.evaluate) {
+    return this.recordings.get(command.resultRunId ?? command.runId)!;
+  }
+
+  private prepare(input: StartRun) {
+    const manifest = createTelemetryManifest(input);
+    if (input.evaluate) {
       manifest.evaluation = this.evaluator.config;
       manifest.policy = this.evaluator.policy;
       manifest.policyVersion = this.evaluator.policy.version;
@@ -89,44 +109,364 @@ export class Runs {
       lastSequence: 0,
       createdAt: new Date().toISOString(),
       endedAt: null,
+      revision: 0,
+      controls: {
+        paused: false,
+        requestedSpeed: 1,
+        waitingForInference: false,
+        pendingApplication: false,
+        elapsedWallMs: 0,
+        injection: null,
+      },
     };
     const events = generateWarmup(manifest, run.id);
     run.lastSequence = events.at(-1)!.sequence;
     const snapshot = createSnapshot(run.id, manifest.organization, events, 0);
-    this.recordings.create(
-      run,
-      {
-        runId: run.id,
-        type: "start",
-        sequence: 1,
-        simulationTimeMs: 0,
-        recordedAt: run.createdAt,
-        parameters: { fixture: manifest.fixture },
-      },
-      events,
-      snapshot,
-    );
-    this.evidence = events;
-    this.current = run;
+    const command: RunCommand = {
+      runId: run.id,
+      type: "start",
+      sequence: 1,
+      simulationTimeMs: 0,
+      recordedAt: run.createdAt,
+      parameters: { fixture: manifest.fixture },
+      ...(input.commandId ? { request: input } : {}),
+    };
+    return { run, events, snapshot, command };
+  }
+
+  private activate(prepared: ReturnType<Runs["prepare"]>) {
+    this.current = prepared.run;
+    this.evidence = prepared.events;
+    this.pending = null;
     this.controller = new AbortController();
-    if (parsed.evaluate) this.evaluate(snapshot);
-    return this.recordings.get(run.id)!;
+    this.repace();
+    if (
+      prepared.run.manifest.schemaVersion === 2 &&
+      prepared.run.manifest.evaluation
+    )
+      this.evaluate(prepared.snapshot);
+  }
+
+  start(input: unknown) {
+    const parsed = startRunSchema.parse(input);
+    this.available();
+    const duplicate = this.duplicate(parsed);
+    if (duplicate) return duplicate;
+    if (this.recordings.active())
+      throw new RunError(
+        "run_active",
+        "A run is already active. Reset it or wait for it to finish.",
+      );
+    const prepared = this.prepare(parsed);
+    this.recordings.create(
+      prepared.run,
+      prepared.command,
+      prepared.events,
+      prepared.snapshot,
+    );
+    this.activate(prepared);
+    return this.recordings.get(prepared.run.id)!;
+  }
+
+  control(runId: string, input: unknown) {
+    const request = controlRunSchema.parse(input);
+    this.available();
+    const duplicate = this.duplicate(request, runId);
+    if (duplicate) return duplicate;
+    const run =
+      this.current ??
+      (request.type === "reset" ? this.recordings.run(runId) : null);
+    if (
+      !run ||
+      run.id !== runId ||
+      (run.status !== "running" && request.type !== "reset")
+    )
+      throw new RunError(
+        "invalid_transition",
+        "This run is no longer active. Load the active run before sending controls.",
+      );
+    const controls = { ...run.controls! };
+    const invalid = (message: string): never => {
+      throw new RunError("invalid_transition", message);
+    };
+    const command: RunCommand = {
+      runId,
+      type: request.type,
+      sequence: this.recordings.nextCommandSequence(runId),
+      simulationTimeMs: run.simulationTimeMs,
+      recordedAt: new Date().toISOString(),
+      request,
+    };
+    switch (request.type) {
+      case "pause":
+        if (controls.paused) invalid("This run is already paused.");
+        controls.paused = true;
+        controls.pausedAttemptId =
+          this.recordings.attempts(runId).at(-1)?.id ?? null;
+        break;
+      case "resume":
+        if (!controls.paused) invalid("This run is already running.");
+        controls.paused = false;
+        controls.pausedAttemptId = null;
+        break;
+      case "set-speed":
+        controls.requestedSpeed = request.speed;
+        command.parameters = { speed: request.speed };
+        break;
+      case "begin-injection":
+        if (run.manifest.schemaVersion !== 2 || !run.manifest.interactive)
+          invalid(
+            "Begin is available on interactive runs. Start an interactive run first.",
+          );
+        if (controls.injection && controls.injection.stoppedAtMs === null)
+          invalid(
+            "Injection is already active. Stop it before beginning another scenario.",
+          );
+        if (run.simulationTimeMs >= run.manifest.durationSeconds * 1000)
+          invalid(
+            "The final checkpoint is already reached. Reset to begin a new scenario.",
+          );
+        controls.injection = {
+          fixture: request.fixture,
+          startedAtMs: run.simulationTimeMs,
+          stoppedAtMs: null,
+        };
+        command.parameters = { fixture: request.fixture };
+        break;
+      case "stop-injection":
+        if (!controls.injection || controls.injection.stoppedAtMs !== null)
+          invalid("No injection is active.");
+        controls.injection = {
+          ...controls.injection!,
+          stoppedAtMs: run.simulationTimeMs,
+        };
+        break;
+      case "reset": {
+        const manifest = run.manifest;
+        if (manifest.schemaVersion !== 2)
+          return invalid("Legacy recordings cannot be reset.");
+        const prepared = this.prepare(
+          startRunSchema.parse({
+            seed: manifest.seed,
+            durationSeconds: manifest.durationSeconds,
+            fixture: manifest.fixture,
+            interactive: manifest.interactive ?? false,
+            evaluate: Boolean(manifest.evaluation),
+            ...(manifest.scenario &&
+            manifest.scenario.stopAtMs <= manifest.durationSeconds * 1000
+              ? { stopInjectionAtSeconds: manifest.scenario.stopAtMs / 1000 }
+              : {}),
+          }),
+        );
+        command.resultRunId = prepared.run.id;
+        const ended = this.revise({
+          ...run,
+          ...(run.status === "running"
+            ? {
+                status: "interrupted" as const,
+                endedAt: command.recordedAt,
+                endedReason: "reset" as const,
+                controls: { ...controls, waitingForInference: false },
+              }
+            : {}),
+          replacementRunId: prepared.run.id,
+        });
+        this.recordings.transaction(() => {
+          this.recordings.commit(ended, [], undefined, undefined, [command]);
+          this.recordings.create(
+            prepared.run,
+            prepared.command,
+            prepared.events,
+            prepared.snapshot,
+          );
+        });
+        this.controller.abort();
+        this.activate(prepared);
+        this.publish({
+          type: "run.updated",
+          run: ended,
+          events: [],
+          commands: [command],
+        });
+        return this.recordings.get(prepared.run.id)!;
+      }
+    }
+    let updated = this.revise({ ...run, controls });
+    const applied =
+      request.type === "resume"
+        ? this.recordings
+            .attempts(runId)
+            .filter(
+              (attempt) =>
+                attempt.status !== "pending" && attempt.appliedAt === null,
+            )
+            .map((attempt) => this.applyAttempt(attempt, updated))
+        : [];
+    if (request.type === "resume") {
+      updated.controls!.pendingApplication = false;
+      const response = [...applied]
+        .reverse()
+        .find((attempt) => attempt.response)?.response;
+      if (response)
+        updated.manifest = {
+          ...updated.manifest,
+          resolvedModel: response.model,
+        };
+      if (
+        !this.pending &&
+        run.simulationTimeMs === run.manifest.durationSeconds * 1000
+      )
+        updated = {
+          ...updated,
+          status: "completed",
+          endedAt: command.recordedAt,
+        };
+    }
+    this.recordings.transaction(() => {
+      for (const attempt of applied) this.recordings.saveAttempt(attempt);
+      this.recordings.commit(updated, [], undefined, undefined, [command]);
+    });
+    this.current = updated.status === "running" ? updated : null;
+    this.repace();
+    this.publish({
+      type: "run.updated",
+      run: updated,
+      events: [],
+      commands: [command],
+      attempts: applied,
+    });
+    return this.recordings.get(runId)!;
+  }
+
+  private revise(run: Run): Run {
+    return {
+      ...run,
+      revision: run.revision + 1,
+      ...(run.controls
+        ? {
+            controls: {
+              ...run.controls,
+              elapsedWallMs: Math.max(
+                0,
+                (run.endedAt ? Date.parse(run.endedAt) : Date.now()) -
+                  Date.parse(run.createdAt),
+              ),
+            },
+          }
+        : {}),
+    };
+  }
+  private repace(now = performance.now()) {
+    this.nextTickAt =
+      now + 1000 / (this.current?.controls?.requestedSpeed ?? 1);
+  }
+  // Production uses a short wall-clock pulse. Tests can advance one exact simulation step with tick().
+  pulse(now = performance.now()) {
+    if (!this.current || this.current.controls?.paused || this.pending) {
+      this.repace(now);
+      return;
+    }
+    if (now < this.nextTickAt) return;
+    this.tick();
+    // Never catch up by dropping checkpoints or bursting after a pause/inference wait.
+    this.repace(now);
   }
 
   tick() {
-    if (this.failure || this.pending) return;
+    if (this.failure || this.pending || this.current?.controls?.paused) return;
     const run = this.current;
     if (!run) return;
     let message: RunMessage;
     let checkpoint: ObservableSnapshot | undefined;
-    let finishAfterEvaluation = false;
     try {
       const simulationTimeMs = run.simulationTimeMs + run.manifest.tickMs;
       const manifest = run.manifest;
       if (manifest.schemaVersion !== 2)
         throw new Error("Legacy runs cannot resume generation");
-      const fixture = fixtureObservations(manifest, simulationTimeMs);
-      const commands = scheduledCommands(manifest, run.id, simulationTimeMs);
+      let injectionManifest = manifest;
+      let commands = scheduledCommands(manifest, run.id, simulationTimeMs);
+      let controls = { ...run.controls! };
+      if (manifest.interactive) {
+        commands = [];
+        const injection = controls.injection;
+        if (injection && injection.stoppedAtMs === null) {
+          const plan = createScenarioPlan(
+            startRunSchema.parse({
+              seed: manifest.seed,
+              fixture: injection.fixture,
+            }),
+            manifest.organization,
+          )!;
+          const offset = injection.startedAtMs - 4000;
+          const scenario = {
+            ...plan,
+            stopAtMs: plan.stopAtMs + offset,
+            stages: plan.stages.map((stage) => ({
+              ...stage,
+              startMs: stage.startMs + offset,
+              endExclusiveMs: stage.endExclusiveMs + offset,
+            })),
+          };
+          injectionManifest = {
+            ...manifest,
+            fixture: injection.fixture,
+            scenarioVersion: "scenarios/1",
+            scenario,
+          };
+          if (simulationTimeMs === scenario.stopAtMs) {
+            controls = {
+              ...controls,
+              injection: { ...injection, stoppedAtMs: simulationTimeMs },
+            };
+            commands = [
+              {
+                runId: run.id,
+                type: "stop-injection",
+                sequence: 0,
+                simulationTimeMs,
+                recordedAt: new Date().toISOString(),
+                parameters: { fixture: injection.fixture },
+              },
+            ];
+          }
+        }
+      } else {
+        for (const command of commands) {
+          if (command.type === "begin-injection" && manifest.scenario)
+            controls.injection = {
+              fixture: manifest.fixture as
+                "credential-compromise" | "benign-maintenance",
+              startedAtMs: simulationTimeMs,
+              stoppedAtMs: null,
+            };
+          if (command.type === "stop-injection" && controls.injection)
+            controls.injection = {
+              ...controls.injection,
+              stoppedAtMs: simulationTimeMs,
+            };
+        }
+        // An operator stop overrides the remaining prerecorded scenario schedule.
+        if (
+          run.controls?.injection?.stoppedAtMs !== null &&
+          run.controls?.injection
+        ) {
+          injectionManifest = {
+            ...manifest,
+            fixture: "baseline",
+            scenarioVersion: "fixtures/1",
+            scenario: undefined,
+          };
+          commands = [];
+        }
+      }
+      if (commands.length) {
+        const sequence = this.recordings.nextCommandSequence(run.id);
+        commands = commands.map((command, index) => ({
+          ...command,
+          sequence: sequence + index,
+        }));
+      }
+      const fixture = fixtureObservations(injectionManifest, simulationTimeMs);
       const observations = orderObservations(manifest, simulationTimeMs, [
         ...baselineObservations(manifest, simulationTimeMs),
         ...fixture.observations,
@@ -160,22 +500,21 @@ export class Runs {
               .map((event) => event.sequence),
           }
         : undefined;
-      const complete = simulationTimeMs === run.manifest.durationSeconds * 1000;
+      const complete = simulationTimeMs === manifest.durationSeconds * 1000;
       if (
         manifest.evaluation &&
         (simulationTimeMs % manifest.evaluation.checkpointMs === 0 || complete)
-      ) {
+      )
         checkpoint = snapshot;
-        finishAfterEvaluation = complete;
-      }
       const finished = complete && !checkpoint;
-      const updated: Run = {
+      const updated = this.revise({
         ...run,
+        controls,
         simulationTimeMs,
         lastSequence: events.at(-1)!.sequence,
         status: finished ? "completed" : "running",
         endedAt: finished ? new Date().toISOString() : null,
-      };
+      });
       message = runMessageSchema.parse({
         type: "run.updated",
         run: updated,
@@ -187,144 +526,169 @@ export class Runs {
       this.evidence = finished ? [] : evidence;
       this.current = finished ? null : updated;
     } catch {
-      this.current = null;
-      this.failure = {
-        type: "recording.error",
-        runId: run.id,
-        message:
-          "Recording failed. Generation stopped at the last saved step. Restart the backend after checking storage.",
-      };
-      try {
-        const failed: Run = {
-          ...run,
-          status: "failed",
-          endedAt: new Date().toISOString(),
-        };
-        this.recordings.commit(failed);
-        this.publish({ type: "run.updated", run: failed, events: [] });
-      } catch {
-        /* The error message does not claim that failure status was saved. */
-      }
-      this.publish(this.failure);
+      this.fail(
+        run,
+        "Recording failed. Generation stopped at the last saved step. Restart the backend after checking storage.",
+      );
       return;
     }
-    // Transport errors must never roll back the clock of an already committed step.
     this.publish(message);
-    if (checkpoint) this.evaluate(checkpoint, finishAfterEvaluation);
+    if (checkpoint) this.evaluate(checkpoint);
   }
 
-  private evaluate(snapshot: ObservableSnapshot, complete = false) {
+  private applyAttempt(attempt: InferenceAttempt, run: Run): InferenceAttempt {
+    return {
+      ...attempt,
+      appliedAt: new Date().toISOString(),
+      appliedSimulationTimeMs: run.simulationTimeMs,
+    };
+  }
+
+  private evaluate(snapshot: ObservableSnapshot) {
     const signal = this.controller.signal;
-    this.pending = this.evaluator
+    const task = this.evaluator
       .checkpoint(
         snapshot,
-        (attempt) => {
-          const resolved =
-            attempt.response && this.current?.id === snapshot.runId
-              ? {
-                  ...this.current,
-                  manifest: {
-                    ...this.current.manifest,
-                    resolvedModel: attempt.response.model,
-                  },
-                }
-              : undefined;
-          this.recordings.saveAttempt(attempt, resolved);
-          if (resolved) {
-            this.current = resolved;
-            this.publish({ type: "run.updated", run: resolved, events: [] });
-          }
+        (value) => {
+          // Read the owning run even after reset: an old response may only mutate its recording.
+          const owner = this.recordings.run(snapshot.runId)!;
+          const live =
+            this.current?.id === owner.id &&
+            owner.status === "running" &&
+            !signal.aborted;
+          let attempt: InferenceAttempt = {
+            ...value,
+            appliedAt: null,
+            appliedSimulationTimeMs: null,
+          };
+          if (live && !owner.controls!.paused && attempt.status !== "pending")
+            attempt = this.applyAttempt(attempt, owner);
+          const updated = this.revise({
+            ...owner,
+            controls: {
+              ...owner.controls!,
+              waitingForInference: live,
+              pendingApplication:
+                owner.controls!.pendingApplication ||
+                (live &&
+                  owner.controls!.paused &&
+                  attempt.status !== "pending"),
+            },
+            manifest:
+              attempt.response && attempt.appliedAt
+                ? { ...owner.manifest, resolvedModel: attempt.response.model }
+                : owner.manifest,
+          });
+          this.recordings.saveAttempt(attempt, updated);
+          if (live) this.current = updated;
           this.publish({
             type: "inference.updated",
-            runId: snapshot.runId,
+            runId: owner.id,
+            run: updated,
             attempt,
           });
         },
         signal,
       )
       .then(() => {
-        if (!complete || signal.aborted || this.current?.id !== snapshot.runId)
-          return;
-        const finished: Run = {
-          ...this.current,
-          status: "completed",
-          endedAt: new Date().toISOString(),
-        };
-        this.recordings.commit(finished);
-        this.current = null;
-        this.evidence = [];
-        this.publish({ type: "run.updated", run: finished, events: [] });
+        if (signal.aborted || this.current?.id !== snapshot.runId) return;
+        const run = this.current;
+        const complete =
+          !run.controls!.paused &&
+          run.simulationTimeMs === run.manifest.durationSeconds * 1000;
+        const updated = this.revise({
+          ...run,
+          controls: { ...run.controls!, waitingForInference: false },
+          status: complete ? "completed" : "running",
+          endedAt: complete ? new Date().toISOString() : null,
+        });
+        this.recordings.commit(updated);
+        this.current = complete ? null : updated;
+        if (complete) this.evidence = [];
+        this.publish({ type: "run.updated", run: updated, events: [] });
       })
       .catch(() => {
-        // An evaluator failure is recorded normally. Reaching here means persistence failed.
-        const run = this.current;
-        this.current = null;
-        this.failure = {
-          type: "recording.error",
-          runId: snapshot.runId,
-          message:
-            "Inference recording failed. Generation stopped at the last saved checkpoint. Check storage and restart the backend.",
-        };
-        if (run) {
-          try {
-            const failed: Run = {
-              ...run,
-              status: "failed",
-              endedAt: new Date().toISOString(),
-            };
-            this.recordings.commit(failed);
-            this.publish({ type: "run.updated", run: failed, events: [] });
-          } catch {
-            /* Preserve the last durable state. */
-          }
-        }
-        this.publish(this.failure);
+        // Persistence errors in an old request must not mark a replacement run failed.
+        const owner = this.recordings.run(snapshot.runId);
+        if (owner)
+          this.fail(
+            owner,
+            "Inference recording failed. Check storage and restart the backend.",
+          );
       })
       .finally(() => {
-        this.pending = null;
+        this.outstanding.delete(task);
+        if (this.pending === task) {
+          this.pending = null;
+          this.repace();
+        }
       });
+    this.pending = task;
+    this.outstanding.add(task);
+  }
+
+  private fail(run: Run, message: string) {
+    if (this.current?.id === run.id) this.current = null;
+    this.failure = { type: "recording.error", runId: run.id, message };
+    try {
+      if (run.status === "running") {
+        const failed = this.revise({
+          ...run,
+          status: "failed",
+          endedReason: "storage-failure",
+          endedAt: new Date().toISOString(),
+        });
+        this.recordings.commit(failed);
+        this.publish({ type: "run.updated", run: failed, events: [] });
+      }
+    } catch {
+      /* Preserve the last durable state. */
+    }
+    this.publish(this.failure);
   }
 
   async settled() {
     await this.pending;
   }
-
   async close() {
     this.controller.abort();
-    await this.pending;
+    await Promise.all(this.outstanding);
     this.interrupt();
   }
-
   interrupt() {
     const run = this.recordings.active();
-    if (run) {
-      for (const attempt of this.recordings.attempts(run.id)) {
-        if (attempt.status !== "pending") continue;
-        this.recordings.saveAttempt({
-          ...attempt,
-          status: "failed",
-          completedAt: new Date().toISOString(),
-          latencyMs: Math.max(0, Date.now() - Date.parse(attempt.startedAt)),
-          error: {
-            code: "interrupted",
-            message:
-              "Backend stopped before this attempt completed. Elapsed time includes downtime.",
-            httpStatus: null,
-          },
-          policy: evaluatePolicy(
-            null,
-            run.manifest.schemaVersion === 2 ? run.manifest.policy : undefined,
-          ),
-        });
-      }
-      this.recordings.commit({
-        ...run,
-        status: "interrupted",
-        endedAt: new Date().toISOString(),
+    if (!run) return;
+    for (const attempt of this.recordings.attempts(run.id)) {
+      if (attempt.status !== "pending") continue;
+      this.recordings.saveAttempt({
+        ...attempt,
+        status: "failed",
+        completedAt: new Date().toISOString(),
+        latencyMs: Math.max(0, Date.now() - Date.parse(attempt.startedAt)),
+        error: {
+          code: "interrupted",
+          message:
+            "Backend stopped before this attempt completed. Elapsed time includes downtime.",
+          httpStatus: null,
+        },
+        policy: evaluatePolicy(
+          null,
+          run.manifest.schemaVersion === 2 ? run.manifest.policy : undefined,
+        ),
       });
     }
+    this.recordings.commit(
+      this.revise({
+        ...run,
+        status: "interrupted",
+        endedReason: "shutdown",
+        endedAt: new Date().toISOString(),
+        ...(run.controls
+          ? { controls: { ...run.controls, waitingForInference: false } }
+          : {}),
+      }),
+    );
   }
-
   private publish(message: RunMessage) {
     const parsed = runMessageSchema.parse(message);
     for (const listener of this.listeners) {

@@ -28,6 +28,39 @@ function readJson(row: unknown): unknown {
 export class Recordings {
   constructor(private readonly database: Database.Database) {}
 
+  transaction<T>(operation: () => T): T {
+    return this.database.transaction(operation)();
+  }
+
+  run(id: string): Run | null {
+    const row = this.database
+      .prepare("SELECT record FROM runs WHERE id = ?")
+      .get(id);
+    return row ? runSchema.parse(readJson(row)) : null;
+  }
+
+  command(commandId: string): RunCommand | null {
+    const row = this.database
+      .prepare(
+        "SELECT record FROM commands WHERE json_extract(record, '$.request.commandId') = ?",
+      )
+      .get(commandId);
+    return row ? commandSchema.parse(readJson(row)) : null;
+  }
+
+  nextCommandSequence(runId: string): number {
+    const row = z
+      .object({ sequence: z.number() })
+      .parse(
+        this.database
+          .prepare(
+            "SELECT coalesce(max(sequence), 0) + 1 AS sequence FROM commands WHERE run_id = ?",
+          )
+          .get(runId),
+      );
+    return row.sequence;
+  }
+
   active(): Run | null {
     const row = this.database
       .prepare("SELECT record FROM runs WHERE status = 'running'")
@@ -156,11 +189,12 @@ export class Recordings {
   }
 
   create(
-    run: Run,
+    value: z.input<typeof runSchema>,
     command: RunCommand,
     events: ObservableEvent[] = [],
     snapshot?: ObservableSnapshot,
   ) {
+    const run = runSchema.parse(value);
     this.database.transaction(() => {
       this.database
         .prepare("INSERT INTO runs (id, status, record) VALUES (?, ?, ?)")

@@ -7,7 +7,7 @@ The ticket bodies contain acceptance criteria and blocking references. Native Gi
 
 ## Working order
 
-M1–M4 are implemented. Continue with [#15 — Pause and resume while inference is in flight](https://github.com/the-data-sherpa/project_blackout/issues/15).
+M1–M5 are implemented. Continue with [#19 — Explore the decision timeline and filtered event evidence](https://github.com/the-data-sherpa/project_blackout/issues/19).
 The [M4 evaluation guide](M4-SCENARIOS.md) records real-API results and unmet targets.
 The [M3 evaluation guide](JEV-EVALUATION.md) preserves earlier results, misses and input revisions.
 Work any ticket whose blocking issues are all complete. A readiness label describes specification readiness; dependencies determine when work can start.

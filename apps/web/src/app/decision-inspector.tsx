@@ -40,10 +40,35 @@ export function DecisionInspector({
     return () => window.clearInterval(timer);
   }, []);
   const { attempts, run } = recording;
-  const latest = attempts.at(-1);
-  const success = attempts.findLast(
-    (attempt) => attempt.status === "succeeded",
+  const liveAttempts =
+    run.status === "running" &&
+    run.controls?.paused &&
+    run.controls.pausedAttemptId !== undefined
+      ? attempts.slice(
+          0,
+          attempts.findIndex(
+            (attempt) => attempt.id === run.controls!.pausedAttemptId,
+          ) + 1,
+        )
+      : attempts;
+  const visible = liveAttempts.map((attempt) =>
+    run.status === "running" &&
+    attempt.appliedAt === null &&
+    attempt.status !== "pending"
+      ? {
+          ...attempt,
+          status: "pending" as const,
+          response: null,
+          error: null,
+          policy: null,
+          completedAt: null,
+          latencyMs: null,
+          responseBody: null,
+        }
+      : attempt,
   );
+  const latest = visible.at(-1);
+  const success = visible.findLast((attempt) => attempt.status === "succeeded");
   const selected =
     attempts.find((attempt) => attempt.id === selectedId) ?? latest;
   const enabled = run.manifest.schemaVersion === 2 && !!run.manifest.evaluation;
@@ -64,11 +89,13 @@ export function DecisionInspector({
       ? "Recorded results"
       : !connected
         ? "Disconnected — state may be stale"
-        : pending
-          ? "Waiting for Jev — simulation held"
-          : failed
-            ? "Unavailable — last decision may be stale"
-            : "Live inference";
+        : run.controls?.paused
+          ? "Paused — live decisions frozen; saved attempts remain inspectable"
+          : pending
+            ? "Waiting for Jev — simulation held"
+            : failed
+              ? "Unavailable — last decision may be stale"
+              : "Live inference";
   return (
     <section
       className="mb-8 min-w-0 space-y-4 rounded-lg border border-violet-400/40 bg-violet-950/10 p-4 sm:p-5"
@@ -143,6 +170,16 @@ export function DecisionInspector({
                 </Value>
                 <Value label="Attempt">
                   {selected.attemptNumber} · {selected.status}
+                </Value>
+                <Value label="Response received">
+                  {selected.completedAt ?? "Pending"}
+                </Value>
+                <Value label="Applied to live display">
+                  {selected.appliedAt === undefined
+                    ? "Legacy recording"
+                    : selected.appliedAt === null
+                      ? "Not applied"
+                      : `${selected.appliedAt} · ${(selected.appliedSimulationTimeMs ?? 0) / 1000}s`}
                 </Value>
                 <Value label="Wall latency">
                   {selected.latencyMs === null
@@ -228,6 +265,8 @@ export function DecisionInspector({
                   questionVersion: selected.questionVersion,
                   startedAt: selected.startedAt,
                   completedAt: selected.completedAt,
+                  appliedAt: selected.appliedAt,
+                  appliedSimulationTimeMs: selected.appliedSimulationTimeMs,
                   latencyMs: selected.latencyMs,
                   responseBody: selected.responseBody,
                 }}

@@ -479,3 +479,154 @@ test("launches the full sequence, inspects second-host evidence and retains unav
     timeout: 15_000,
   });
 });
+
+test("controls an interactive run, retries a lost acknowledgement and recovers stream gaps and disconnected reset", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.setDefaultTimeout(10000);
+  let disconnect: (() => void) | undefined;
+  let connections = 0;
+  let dropOne = false;
+  let duplicateOne = false;
+  let holdConnection = false;
+  await page.routeWebSocket(/\/ws\?runId=/, (ws) => {
+    connections++;
+    const server = ws.connectToServer();
+    disconnect = () => {
+      ws.close();
+      server.close();
+    };
+    server.onMessage((message) => {
+      if (holdConnection) return;
+      const parsed = JSON.parse(String(message));
+      if (dropOne && parsed.type === "run.updated" && parsed.events.length) {
+        dropOne = false;
+        return;
+      }
+      ws.send(message);
+      if (duplicateOne && parsed.type === "run.updated") {
+        duplicateOne = false;
+        ws.send(message);
+      }
+    });
+  });
+  await page.goto("/");
+  await page.getByLabel("Interactive mode", { exact: false }).check();
+  await page.getByLabel("Duration (simulation seconds)").fill("20");
+  await page.getByRole("button", { name: "Start run", exact: true }).click();
+  const pause = page.getByRole("button", { name: "Pause", exact: true });
+  await expect(pause).toBeEnabled();
+  const original = (await page.getByTestId("run-id").textContent())!;
+  await pause.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Paused", { exact: true })).toBeVisible();
+  const frozenTime = await page.getByTestId("simulation-time").textContent();
+  const frozenEvents = await page.getByTestId("event-count").textContent();
+  await page
+    .getByRole("combobox", { name: "Requested speed", exact: true })
+    .selectOption("5");
+  await page.getByRole("button", { name: "Begin Attack", exact: true }).click();
+  await expect(
+    page.getByText("Injecting attack activity", { exact: true }),
+  ).toBeVisible();
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId("simulation-time")).toHaveText(frozenTime!);
+  await expect(page.getByTestId("event-count")).toHaveText(frozenEvents!);
+  await page.getByRole("button", { name: "Stop Attack", exact: true }).click();
+  await expect(
+    page.getByText("Normal mode — baseline telemetry", { exact: true }),
+  ).toBeVisible();
+
+  // Commit the command but lose its HTTP acknowledgement. Retrying reuses its ID.
+  let loseOnce = true;
+  await page.route(`**/api/runs/${original}/commands`, async (route) => {
+    if (loseOnce && route.request().postDataJSON().type === "resume") {
+      loseOnce = false;
+      await route.fetch();
+      await route.abort();
+    } else await route.continue();
+  });
+  duplicateOne = true;
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Retry unconfirmed command" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Retry unconfirmed command" }).click();
+  await expect(pause).toBeEnabled();
+  await pause.click();
+  const saved = recordingSchema.parse(
+    await (
+      await request.get(`http://localhost:3101/api/runs/${original}`)
+    ).json(),
+  );
+  expect(saved.commands.filter((c) => c.type === "resume")).toHaveLength(1);
+  await page.unroute(`**/api/runs/${original}/commands`);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Resume", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("combobox", { name: "Requested speed", exact: true }),
+  ).toHaveValue("5");
+  const beforeGap = connections;
+  dropOne = true;
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect.poll(() => connections).toBeGreaterThan(beforeGap);
+  await expect(pause).toBeEnabled();
+  await pause.click();
+
+  holdConnection = true;
+  disconnect!();
+  await expect(
+    page.getByText(/^(Disconnected|Resynchronizing)$/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Resume", exact: true }),
+  ).toBeDisabled();
+  const reset = recordingSchema.parse(
+    await (
+      await request.post(
+        `http://localhost:3101/api/runs/${original}/commands`,
+        { data: { commandId: crypto.randomUUID(), type: "reset" } },
+      )
+    ).json(),
+  );
+  await request.post(
+    `http://localhost:3101/api/runs/${reset.run.id}/commands`,
+    { data: { commandId: crypto.randomUUID(), type: "pause" } },
+  );
+  holdConnection = false;
+  await expect(
+    page.getByText("Reset ended this run.", { exact: false }),
+  ).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: "View active run" }).click();
+  await expect(page.getByTestId("run-id")).toHaveText(reset.run.id);
+  await expect(
+    page.getByRole("button", { name: "Resume", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("combobox", { name: "Requested speed", exact: true }),
+  ).toHaveValue("1");
+  await expect(page.getByTestId("event-count")).toHaveText("4500");
+  await page.getByRole("button", { name: "Reset run", exact: true }).click();
+  await expect(page.getByTestId("run-id")).not.toHaveText(reset.run.id);
+  await expect(pause).toBeEnabled();
+  await page
+    .getByRole("combobox", { name: "Requested speed", exact: true })
+    .selectOption("5");
+  await expect(page.getByText("Completed", { exact: true })).toBeVisible({
+    timeout: 10000,
+  });
+  expect(errors).toEqual([]);
+});

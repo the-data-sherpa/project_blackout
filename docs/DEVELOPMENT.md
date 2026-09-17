@@ -8,7 +8,7 @@ the evidence behind every aggregate and the focus identity. The full credential
 compromise and benign maintenance scenarios join two minimal comparison fixtures;
 scenario truth stays separate. Stored runs remain
 inspectable after restart. Bounded runs complete automatically. Opt-in Jev evaluation
-records model decisions and policies; interactive attack controls arrive in M5.
+records model decisions and policies. M5 adds interactive controls and reconnect recovery; see [the control contract](M5-CONTROLS.md).
 See [Jev evaluation](JEV-EVALUATION.md) for pacing and earlier reports, and
 [M4 scenarios](M4-SCENARIOS.md) for current input contracts, schedules and the runner.
 
@@ -187,6 +187,7 @@ stored payloads return a storage error, rather than blaming the request input.
 | API                               | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `POST /api/runs`                  | Strict JSON `{ "seed": "demo", "durationSeconds": 30, "fixture": "baseline" }`; seed is 1–128 trimmed characters, duration is an integer from 1–120 (default 30). Fixture defaults to `baseline`; also accepts `credential-attack`, `harmless-anomaly`, `credential-compromise` or `benign-maintenance`. Full scenarios accept `stopInjectionAtSeconds` (1–35, within the run); `evaluate: true` enables Jev. Returns the committed recording with HTTP 201. |
+| `POST /api/runs/:id/commands`     | Accepts a UUID command ID and a supported control; returns the saved recording. See [M5 control payloads](M5-CONTROLS.md#api-and-recording-contract).                                                                                                                                                                                                                                                                                                        |
 | `GET /api/runs?offset=0&limit=20` | Lists run summaries, total count, next offset, and active run ID. Limit accepts 1–100; offset accepts 0–1,000,000. It does not load event bodies.                                                                                                                                                                                                                                                                                                            |
 | `GET /api/runs/active`            | Returns `{ "runId": "…" }` or `{ "runId": null }`.                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `GET /api/runs/:id`               | Returns the manifest, status, clock, ordered events, commands and snapshots from SQLite; no truth rows.                                                                                                                                                                                                                                                                                                                                                      |
@@ -198,10 +199,13 @@ recordings return 404, and storage failures return 503. Unknown request fields
 are rejected, including credentials. The recorder accepts only defined domain
 fields and never copies process environment or HTTP headers into a manifest.
 
-Run sockets carry only their selected run. On refresh, the full snapshot closes
-the gap between the HTTP read and socket subscription. Automatic reconnection
-and broader recovery controls belong to ticket #18. Slow clients are disconnected
-when their outbound buffer exceeds 1 MiB and can reload the saved recording.
+Run sockets carry only their selected run. A full snapshot closes the gap between
+the HTTP read and socket subscription. Each update carries the durable run revision;
+the console resynchronizes automatically after disconnect or a sequence gap. It
+batches rendering separately from simulation progress. Slow clients disconnect
+when their outbound buffer exceeds the initial recording transfer plus 1 MiB.
+See [M5 controls](M5-CONTROLS.md) for command idempotency, reset transactions,
+pause-time arrival, resume-time application and pacing.
 
 ## Docker
 

@@ -230,6 +230,14 @@ export const inferenceAttemptSchema = z
     status: z.enum(["pending", "succeeded", "failed"]),
     startedAt: z.iso.datetime(),
     completedAt: z.iso.datetime().nullable(),
+    // Absent on legacy recordings. Null means this attempt has not entered the live display.
+    appliedAt: z.iso.datetime().nullable().optional(),
+    appliedSimulationTimeMs: z
+      .number()
+      .int()
+      .nonnegative()
+      .nullable()
+      .optional(),
     latencyMs: z.number().nonnegative().nullable(),
     response: jevResponseSchema.nullable(),
     responseBody: z.string().nullable(),
