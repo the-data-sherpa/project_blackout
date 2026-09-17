@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 import { z } from "zod";
 import {
   recordingSchema,
+  runListSchema,
   runSchema,
   type AuthenticationEvent,
   type Recording,
@@ -22,6 +23,30 @@ export class Recordings {
       .prepare("SELECT record FROM runs WHERE status = 'running'")
       .get();
     return row ? runSchema.parse(readJson(row)) : null;
+  }
+
+  list(offset: number, limit: number) {
+    const rows = this.database
+      .prepare(
+        "SELECT record FROM runs ORDER BY json_extract(record, '$.createdAt') DESC, id DESC LIMIT ? OFFSET ?",
+      )
+      .all(limit, offset);
+    const { total } = z
+      .object({ total: z.number() })
+      .parse(this.database.prepare("SELECT count(*) AS total FROM runs").get());
+    return runListSchema.parse({
+      runs: rows.map((row) => {
+        const { manifest, ...run } = runSchema.parse(readJson(row));
+        return {
+          ...run,
+          seed: manifest.seed,
+          durationSeconds: manifest.durationSeconds,
+        };
+      }),
+      total,
+      nextOffset: offset + rows.length < total ? offset + rows.length : null,
+      activeRunId: this.active()?.id ?? null,
+    });
   }
 
   get(id: string): Recording | null {

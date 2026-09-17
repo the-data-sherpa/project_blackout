@@ -10,9 +10,12 @@ The console can start one seeded authentication run, show its simulation clock
 and ordered events, and inspect the persisted manifest and start command. Run
 recordings use SQLite; the backend streams each step after it commits.
 
-This implements the first [MVP ticket](docs/MVP-TICKETS.md). The populated
-organization, recording browser, attack controls, and Jev evaluation remain in
-the backlog. No Jev API key is needed for this slice.
+Stored runs remain available after backend restart. The run browser lists their
+status and opens their saved events without restarting generation. Unfinished
+runs become **Interrupted** on startup.
+
+The populated organization, attack controls, and Jev evaluation remain in the
+[MVP backlog](docs/MVP-TICKETS.md). No Jev API key is needed for this slice.
 
 ## Quick start with Docker
 
@@ -30,8 +33,10 @@ Enter a seed and duration, then choose **Start run**. The default run lasts 30
 simulation seconds and records two authentication events per second. **Completed**
 appears when the last step is saved. Expand **Manifest and command log** to inspect
 the inputs. Keep the page's `?run=…` address to reopen that recording; **Refresh
-recording** reloads saved events and reconnects live updates. Closing the browser
-does not stop generation. Starting a new run preserves previous recordings.
+recording** reloads saved events and reconnects active-run updates. **Stored runs**
+lists saved recordings, newest first. Choose a row to inspect it, or choose
+**View active run** to return to ongoing generation. Closing the browser does
+not stop generation. Starting a new run preserves previous recordings.
 
 ```bash
 docker compose logs -f  # Follow service logs
@@ -109,7 +114,8 @@ npm run test:e2e    # Browser tests against the production build
 ```
 
 Vitest checks transport contracts, configuration, deterministic generation,
-transaction rollback, run isolation, and database persistence. Playwright checks
+transaction rollback, run isolation, and database persistence through process
+termination and restart. Playwright checks stored-run browsing,
 start-to-inspect, recording reload, real connections, failure recovery, keyboard
 access, and a narrow viewport. Browser tests use ports 3100/3101 and an in-memory
 database.
@@ -127,5 +133,6 @@ storage behavior.
 - [Full MVP roadmap: milestones M1–M9 and acceptance criteria](docs/MVP-ROADMAP.md)
 - [Published GitHub tickets and blocking dependencies](docs/MVP-TICKETS.md)
 
-The first milestone covers seeded runs and durable recording. Its restart and
-recording-browser ticket is next. The full MVP requires milestones M1–M9.
+The M1 tickets cover seeded runs and durable recording. The next ticket adds a
+populated synthetic organization and baseline history. The full MVP requires
+milestones M1–M9.

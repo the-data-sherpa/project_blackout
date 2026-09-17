@@ -37,6 +37,21 @@ export const runSchema = z.strictObject({
   endedAt: z.iso.datetime().nullable(),
 });
 
+export const runListQuerySchema = z.strictObject({
+  offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+export const runSummarySchema = runSchema.omit({ manifest: true }).extend({
+  seed: startRunSchema.shape.seed,
+  durationSeconds: startRunSchema.shape.durationSeconds,
+});
+export const runListSchema = z.strictObject({
+  runs: z.array(runSummarySchema),
+  total: z.number().int().nonnegative(),
+  nextOffset: z.number().int().nonnegative().nullable(),
+  activeRunId: runIdSchema.nullable(),
+});
+
 // Observable events carry no scenario names, commands, or hidden truth labels.
 export const authenticationEventSchema = z.strictObject({
   runId: runIdSchema,
@@ -98,6 +113,7 @@ export const runMessageSchema = z.discriminatedUnion("type", [
 export type StartRun = z.infer<typeof startRunSchema>;
 export type RunManifest = z.infer<typeof manifestSchema>;
 export type Run = z.infer<typeof runSchema>;
+export type RunList = z.infer<typeof runListSchema>;
 export type AuthenticationEvent = z.infer<typeof authenticationEventSchema>;
 export type RunCommand = z.infer<typeof commandSchema>;
 export type Recording = z.infer<typeof recordingSchema>;

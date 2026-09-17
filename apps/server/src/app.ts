@@ -8,6 +8,7 @@ import {
   healthSchema,
   recordingSchema,
   runIdSchema,
+  runListQuerySchema,
   serverMessageSchema,
   startRunSchema,
 } from "@blackout/contracts";
@@ -26,6 +27,13 @@ function scheduleTicks(tick: () => void) {
   const timer = setInterval(tick, 1000);
   timer.unref();
   return () => clearInterval(timer);
+}
+
+function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {
+  const parsed = schema.safeParse(input);
+  if (!parsed.success)
+    throw Object.assign(new Error("Invalid request"), { statusCode: 400 });
+  return parsed.data;
 }
 
 export async function buildApp(options: AppOptions) {
@@ -53,10 +61,9 @@ export async function buildApp(options: AppOptions) {
 
     app.setErrorHandler((error, _request, reply) => {
       if (
-        error instanceof z.ZodError ||
-        (error instanceof Error &&
-          "statusCode" in error &&
-          error.statusCode === 400)
+        error instanceof Error &&
+        "statusCode" in error &&
+        error.statusCode === 400
       ) {
         return reply.code(400).send(
           apiErrorSchema.parse({
@@ -84,8 +91,13 @@ export async function buildApp(options: AppOptions) {
     });
 
     app.post("/api/runs", async (request, reply) => {
-      const recording = service.start(startRunSchema.parse(request.body));
+      const recording = service.start(parseInput(startRunSchema, request.body));
       return reply.code(201).send(recordingSchema.parse(recording));
+    });
+
+    app.get("/api/runs", async (request) => {
+      const { offset, limit } = parseInput(runListQuerySchema, request.query);
+      return service.recordings.list(offset, limit);
     });
 
     app.get("/api/runs/active", async () =>
@@ -93,7 +105,10 @@ export async function buildApp(options: AppOptions) {
     );
 
     app.get("/api/runs/:id", async (request, reply) => {
-      const { id } = z.strictObject({ id: runIdSchema }).parse(request.params);
+      const { id } = parseInput(
+        z.strictObject({ id: runIdSchema }),
+        request.params,
+      );
       const recording = service.recordings.get(id);
       if (!recording)
         return reply.code(404).send(
@@ -124,9 +139,10 @@ export async function buildApp(options: AppOptions) {
             await reply.code(403).send({ error: "Origin not allowed" });
             return;
           }
-          const { runId } = z
-            .strictObject({ runId: runIdSchema.optional() })
-            .parse(request.query);
+          const { runId } = parseInput(
+            z.strictObject({ runId: runIdSchema.optional() }),
+            request.query,
+          );
           if (runId && !service.recordings.get(runId))
             await reply.code(404).send({ error: "Recording not found" });
         },

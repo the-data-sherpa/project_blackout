@@ -3,9 +3,9 @@
 ## Scope
 
 The app starts seeded runs, records a minimal authentication stream, and exposes
-the saved events, clock, manifest, and command log in the console. The first
-ticket's bounded run completes automatically. Attack controls, full organization
-generation, and Jev evaluation belong to later tickets.
+the saved events, clock, manifest, and command log in the console. Stored runs
+remain inspectable after restart. Bounded runs complete automatically. Attack
+controls, full organization generation, and Jev evaluation belong to later tickets.
 
 ## Workspace
 
@@ -97,9 +97,12 @@ npm run test:e2e
 Vitest covers runtime contracts, HTTP readiness, WebSocket origin checks, invalid
 configuration, foreign keys, deterministic steps under irregular scheduling,
 same-time event ordering, write rollback, committed stream delivery, cross-run
-isolation, and SQLite persistence across reopen. Playwright
+isolation, and SQLite persistence across reopen. A separate test launches the real
+backend entry point with a file database, kills it with SIGKILL, and restarts it.
+It verifies the exact last committed records, interruption status, clean shutdown,
+and the absence of credential sentinels from API responses and SQLite files. Playwright
 uses ports 3100/3101 and an in-memory database, leaving development data alone.
-It checks start-to-inspect, same-seed runs, recording reload, storage errors,
+It checks start-to-inspect, same-seed runs, stored-run browsing, recording reload, storage errors,
 backend connectivity, retry, disconnection, keyboard access, and a narrow
 viewport. Build before running the browser tests.
 
@@ -147,15 +150,31 @@ SQLite uses WAL with `synchronous=FULL`. Successful commits are the durability
 boundary, subject to the filesystem and device honoring SQLite's sync requests.
 `:memory:` databases are temporary and are used by isolated automated tests.
 Clean shutdown and startup mark unfinished runs interrupted without resuming
-generation. A saved run remains accessible through its URL. Comprehensive
-process-termination tests and the stored-run list are ticket #2.
+generation. Recovery leaves completed and failed statuses intact. A crash during
+a transaction preserves the previous commit. A crash after commit may preserve
+more events than the browser last received; recovery exposes that saved state.
 
-| API                    | Behavior                                                                                                                                                                                  |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/runs`       | Strict JSON `{ "seed": "demo", "durationSeconds": 30 }`; seed is 1–128 trimmed characters, duration is an integer from 1–120 (default 30). Returns the committed recording with HTTP 201. |
-| `GET /api/runs/active` | Returns `{ "runId": "…" }` or `{ "runId": null }`.                                                                                                                                        |
-| `GET /api/runs/:id`    | Returns the manifest, status, clock, ordered events, and ordered commands from SQLite.                                                                                                    |
-| `GET /ws?runId=<uuid>` | Sends `connection.ready`, a full saved `run.snapshot`, then committed `run.updated` event batches or `recording.error`. Omitting `runId` gives only the connection check.                 |
+The stored-run list shows summaries, newest first, with a stable run-ID tiebreaker.
+It loads 20 rows per page and refreshes when the selected run changes status or the
+operator chooses **Refresh runs**. Selecting a completed, failed, or interrupted
+recording reads its records without opening a generation stream or calling Jev.
+An active run continues while the operator inspects a different recording;
+**View active run** returns to it. List errors retain the last loaded rows with
+an error message. No recording deletion or automatic retention limit is applied.
+
+If a write fails and failure status cannot be saved, the database retains the
+previous committed `running` status. The active process stops generation and
+reports `recording.error` to subscribers, including newly connected subscribers.
+After storage is repaired, restart marks that unfinished run interrupted. Invalid
+stored payloads return a storage error, rather than blaming the request input.
+
+| API                               | Behavior                                                                                                                                                                                  |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/runs`                  | Strict JSON `{ "seed": "demo", "durationSeconds": 30 }`; seed is 1–128 trimmed characters, duration is an integer from 1–120 (default 30). Returns the committed recording with HTTP 201. |
+| `GET /api/runs?offset=0&limit=20` | Lists run summaries, total count, next offset, and active run ID. Limit accepts 1–100; offset accepts 0–1,000,000. It does not load event bodies.                                         |
+| `GET /api/runs/active`            | Returns `{ "runId": "…" }` or `{ "runId": null }`.                                                                                                                                        |
+| `GET /api/runs/:id`               | Returns the manifest, status, clock, ordered events, and ordered commands from SQLite.                                                                                                    |
+| `GET /ws?runId=<uuid>`            | Sends `connection.ready`, a full saved `run.snapshot`, then committed `run.updated` event batches or `recording.error`. Omitting `runId` gives only the connection check.                 |
 
 Malformed requests return HTTP 400, a second active run returns 409, missing
 recordings return 404, and storage failures return 503. Unknown request fields

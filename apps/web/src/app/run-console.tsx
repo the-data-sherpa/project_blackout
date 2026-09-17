@@ -10,6 +10,7 @@ import {
   startRunSchema,
   type Recording,
 } from "@blackout/contracts";
+import { RunBrowser } from "./run-browser";
 
 const buttonClass =
   "min-h-11 rounded border border-slate-500 px-4 py-2 text-sm hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-60";
@@ -24,6 +25,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
   const [seed, setSeed] = useState("blackout-demo-001");
   const [duration, setDuration] = useState("30");
   const [runId, setRunId] = useState<string | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [recording, setRecording] = useState<Recording | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +52,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               "Could not check the active run. Check the backend and refresh the page.",
             );
           id = activeRunSchema.parse(await response.json()).runId;
+          if (!disposed) setActiveRunId(id);
         }
         if (!disposed) setRunId(id);
       } catch {
@@ -74,6 +77,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
     if (!runId) return;
     let disposed = false;
     let socket: WebSocket | undefined;
+    let terminal = false;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
       controller.abort();
@@ -92,6 +96,11 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
         const saved = recordingSchema.parse(await response.json());
         if (disposed) return;
         setRecording(saved);
+        if (saved.run.status !== "running") {
+          window.clearTimeout(timeout);
+          setStream("Recorded");
+          return;
+        }
         const url = new URL("/ws", backendUrl);
         url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
         url.searchParams.set("runId", runId!);
@@ -112,6 +121,12 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
                 : message.run;
             if (next.id !== runId) throw new Error("Unexpected run");
             setStream("Connected");
+            if (next.status !== "running") {
+              terminal = true;
+              setActiveRunId((active) => (active === next.id ? null : active));
+              setStream("Recorded");
+              socket?.close();
+            }
             setRecording((previous) => {
               if (message.type === "run.snapshot") return message.recording;
               if (
@@ -140,7 +155,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
         };
         socket.onclose = socket.onerror = () => {
           window.clearTimeout(timeout);
-          if (!disposed) setStream("Disconnected");
+          if (!disposed && !terminal) setStream("Disconnected");
         };
       } catch (cause) {
         if (!disposed) {
@@ -189,6 +204,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
       const saved = recordingSchema.parse(await response.json());
       setRecording(saved);
       setRunId(saved.run.id);
+      setActiveRunId(saved.run.id);
       const url = new URL(window.location.href);
       url.searchParams.set("run", saved.run.id);
       window.history.replaceState(null, "", url);
@@ -204,6 +220,15 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
   }
 
   const run = recording?.run;
+  function selectRun(id: string) {
+    setError(null);
+    if (id !== runId) setRecording(null);
+    setRunId(id);
+    setAttempt((value) => value + 1);
+    const url = new URL(window.location.href);
+    url.searchParams.set("run", id);
+    window.history.replaceState(null, "", url);
+  }
   const loading = busy || (runId !== null && run?.id !== runId);
   return (
     <section className="min-w-0 space-y-6 py-8" aria-labelledby="runs-title">
@@ -256,7 +281,9 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
           </label>
           <button
             className={`${buttonClass} bg-emerald-300 font-medium text-slate-950 hover:bg-emerald-200`}
-            disabled={loading || run?.status === "running"}
+            disabled={
+              loading || activeRunId !== null || run?.status === "running"
+            }
             type="submit"
           >
             {loading ? "Loading…" : "Start run"}
@@ -266,6 +293,24 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
           One active run at a time. Each run ends at its chosen duration.
         </p>
       </form>
+      {activeRunId && activeRunId !== runId && (
+        <p className="text-sm text-slate-300">
+          A run is still active.{" "}
+          <button
+            className="min-h-11 underline underline-offset-4"
+            onClick={() => selectRun(activeRunId)}
+          >
+            View active run
+          </button>
+        </p>
+      )}
+      <RunBrowser
+        backendUrl={backendUrl}
+        selectedId={runId}
+        refreshKey={`${run?.id ?? ""}:${run?.status ?? ""}`}
+        onSelect={selectRun}
+        onActiveRun={setActiveRunId}
+      />
       {error && (
         <div
           role="alert"
@@ -354,6 +399,18 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               <dd className="mt-2 font-mono text-sm">{stream}</dd>
             </div>
           </dl>
+          {run.status !== "running" && (
+            <p className="mb-5 text-sm text-slate-300">
+              Viewing saved events. Opening this recording does not restart
+              generation.
+            </p>
+          )}
+          {run.status === "failed" && (
+            <p className="mb-5 text-sm text-amber-200">
+              Recording stopped after a write failure. Only committed events are
+              available.
+            </p>
+          )}
           {stream === "Disconnected" && (
             <p className="mb-5 text-sm text-amber-200">
               Live updates disconnected. Refresh the recording to see the latest

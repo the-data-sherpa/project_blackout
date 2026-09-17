@@ -18,6 +18,9 @@ test("starts, watches, reloads and inspects isolated seeded recordings", async (
   ).toBeDisabled();
   const firstUrl = page.url();
   const firstId = await page.getByTestId("run-id").textContent();
+  await expect(
+    page.getByRole("button", { name: `Inspect run ${firstId}` }),
+  ).toBeVisible();
   await expect(page.getByTestId("event-count")).toHaveText("6");
   await expect(page.getByText("Completed", { exact: true })).toBeVisible();
   await expect(page.getByTestId("simulation-time")).toHaveText("3.0 / 3 s");
@@ -36,6 +39,17 @@ test("starts, watches, reloads and inspects isolated seeded recordings", async (
   await page.getByLabel("Duration (simulation seconds)").fill("3");
   await page.getByRole("button", { name: "Start run", exact: true }).click();
   await expect(page.getByTestId("run-id")).not.toHaveText(firstId!);
+  const secondId = await page.getByTestId("run-id").textContent();
+  await page.getByRole("button", { name: `Inspect run ${firstId}` }).click();
+  await expect(page.getByTestId("run-id")).toHaveText(firstId!);
+  await expect(
+    page.getByText("Viewing saved events.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Start run", exact: true }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "View active run" }).click();
+  await expect(page.getByTestId("run-id")).toHaveText(secondId!);
   await expect(page.getByText("Completed", { exact: true })).toBeVisible();
   await expect(page.getByTestId("event-row")).toHaveCount(6);
   expect(await page.getByTestId("event-row").allTextContents()).toEqual(
@@ -44,6 +58,23 @@ test("starts, watches, reloads and inspects isolated seeded recordings", async (
   await page.goto(firstUrl);
   await expect(page.getByTestId("run-id")).toHaveText(firstId!);
   await expect(page.getByTestId("event-row")).toHaveCount(6);
+  await page.getByRole("button", { name: `Inspect run ${secondId}` }).click();
+  await expect(page.getByTestId("run-id")).toHaveText(secondId!);
+  await expect(page.getByText("Recorded", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: `Inspect run ${firstId}` }).click();
+  await expect(page.getByTestId("run-id")).toHaveText(firstId!);
+
+  await page.route("**/api/runs?*", (route) => route.abort());
+  await page.getByRole("button", { name: "Refresh runs", exact: true }).click();
+  await expect(
+    page.getByText("Could not load stored runs.", { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByTestId("run-id")).toHaveText(firstId!);
+  await page.unroute("**/api/runs?*");
+  await page.getByRole("button", { name: "Refresh runs", exact: true }).click();
+  await expect(
+    page.getByText("Could not load stored runs.", { exact: false }),
+  ).not.toBeVisible();
 
   await page.setViewportSize({ width: 375, height: 812 });
   expect(

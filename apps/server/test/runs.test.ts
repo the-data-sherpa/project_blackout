@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, expect, it } from "vitest";
 import {
   recordingSchema,
+  runListSchema,
   serverMessageSchema,
   type RunMessage,
   type ServerMessage,
@@ -318,4 +319,198 @@ it("does not rewind a committed step when a transport subscriber throws", () => 
     simulationTimeMs: 2000,
     lastSequence: 4,
   });
+});
+
+it("lists every stored run in stable pages and identifies the active run", async () => {
+  const { app, tick } = await createApp();
+  expect(runListSchema.parse((await app.inject("/api/runs")).json())).toEqual({
+    runs: [],
+    total: 0,
+    nextOffset: null,
+    activeRunId: null,
+  });
+  const created = [];
+  for (const seed of ["page-one", "page-two", "page-three"]) {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/runs",
+      payload: { seed, durationSeconds: 1 },
+    });
+    created.push(recordingSchema.parse(response.json()).run);
+    if (seed !== "page-three") tick();
+  }
+  const first = runListSchema.parse(
+    (await app.inject("/api/runs?limit=2")).json(),
+  );
+  const second = runListSchema.parse(
+    (await app.inject("/api/runs?limit=2&offset=2")).json(),
+  );
+  expect(first.total).toBe(3);
+  expect(first.nextOffset).toBe(2);
+  expect(second.nextOffset).toBeNull();
+  expect(first.activeRunId).toBe(created[2]?.id);
+  const summaries = [...first.runs, ...second.runs];
+  expect(summaries.map((run) => run.id)).toEqual(
+    [...created]
+      .sort(
+        (a, b) =>
+          b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
+      )
+      .map((run) => run.id),
+  );
+  expect(summaries.filter((run) => run.status === "completed")).toHaveLength(2);
+  expect(
+    summaries.every(
+      (run) => !Object.hasOwn(run, "events") && !Object.hasOwn(run, "manifest"),
+    ),
+  ).toBe(true);
+  for (const query of [
+    "limit=0",
+    "limit=101",
+    "offset=-1",
+    "offset=1.5",
+    "offset=abc",
+    "extra=true",
+  ]) {
+    expect((await app.inject(`/api/runs?${query}`)).statusCode).toBe(400);
+  }
+});
+
+it("reports failed start writes over HTTP without creating a phantom recording", async () => {
+  const { path, database } = createStore();
+  const app = await buildApp({
+    databasePath: path,
+    webOrigin: "http://localhost:3000",
+    schedule: () => () => {},
+  });
+  cleanup.push(() => app.close());
+  await app.ready();
+  database.exec(
+    "CREATE TRIGGER fail_start BEFORE INSERT ON commands BEGIN SELECT RAISE(ABORT, 'private-disk-details'); END;",
+  );
+  const failed = await app.inject({
+    method: "POST",
+    url: "/api/runs",
+    payload: { seed: "failed-start" },
+  });
+  expect(failed.statusCode).toBe(503);
+  expect(failed.json().code).toBe("recording_unavailable");
+  expect(failed.body).not.toContain("private-disk-details");
+  expect(
+    runListSchema.parse((await app.inject("/api/runs")).json()).total,
+  ).toBe(0);
+  database.exec("DROP TRIGGER fail_start;");
+  const retried = await app.inject({
+    method: "POST",
+    url: "/api/runs",
+    payload: { seed: "retry" },
+  });
+  expect(retried.statusCode).toBe(201);
+  expect(
+    runListSchema.parse((await app.inject("/api/runs")).json()).total,
+  ).toBe(1);
+});
+
+it("reports a storage failure even when it cannot persist failed status", async () => {
+  const { path, database } = createStore();
+  let tick = () => {};
+  const app = await buildApp({
+    databasePath: path,
+    webOrigin: "http://localhost:3000",
+    schedule: (callback) => {
+      tick = callback;
+      return () => {};
+    },
+  });
+  cleanup.push(() => app.close());
+  await app.ready();
+  const started = recordingSchema.parse(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/runs",
+        payload: { seed: "disk-full", durationSeconds: 3 },
+      })
+    ).json(),
+  );
+  tick();
+  const messages: ServerMessage[] = [];
+  const socket = await app.injectWS(
+    `/ws?runId=${started.run.id}`,
+    {},
+    {
+      onInit: (client) => {
+        client.on("message", (payload) =>
+          messages.push(serverMessageSchema.parse(JSON.parse(String(payload)))),
+        );
+      },
+    },
+  );
+  cleanup.push(() => socket.terminate());
+  database.exec(
+    "CREATE TRIGGER fail_events BEFORE INSERT ON events BEGIN SELECT RAISE(ABORT, 'disk full'); END; CREATE TRIGGER fail_status BEFORE UPDATE ON runs BEGIN SELECT RAISE(ABORT, 'disk full'); END;",
+  );
+  try {
+    tick();
+    tick();
+    await expect
+      .poll(() =>
+        messages.some((message) => message.type === "recording.error"),
+      )
+      .toBe(true);
+    const saved = recordingSchema.parse(
+      (await app.inject(`/api/runs/${started.run.id}`)).json(),
+    );
+    expect(saved.run).toMatchObject({
+      status: "running",
+      simulationTimeMs: 1000,
+      lastSequence: 2,
+    });
+    expect(saved.events).toHaveLength(2);
+    expect(
+      messages.filter((message) => message.type === "run.updated"),
+    ).toEqual([]);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/runs",
+          payload: { seed: "not-accepted" },
+        })
+      ).statusCode,
+    ).toBe(503);
+  } finally {
+    database.exec("DROP TRIGGER fail_events; DROP TRIGGER fail_status;");
+  }
+});
+
+it("classifies invalid saved data as a recording failure rather than bad request input", async () => {
+  const { path, database } = createStore();
+  let tick = () => {};
+  const app = await buildApp({
+    databasePath: path,
+    webOrigin: "http://localhost:3000",
+    schedule: (callback) => {
+      tick = callback;
+      return () => {};
+    },
+  });
+  cleanup.push(() => app.close());
+  await app.ready();
+  const started = recordingSchema.parse(
+    (
+      await app.inject({
+        method: "POST",
+        url: "/api/runs",
+        payload: { seed: "bad-record", durationSeconds: 1 },
+      })
+    ).json(),
+  );
+  tick();
+  database
+    .prepare("UPDATE events SET record = ? WHERE run_id = ?")
+    .run(JSON.stringify({ invalid: "stored event" }), started.run.id);
+  const response = await app.inject(`/api/runs/${started.run.id}`);
+  expect(response.statusCode).toBe(503);
+  expect(response.json().code).toBe("recording_unavailable");
 });
