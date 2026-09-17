@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { runMessageSchema } from "./runs.js";
+
+export * from "./runs.js";
 
 export const healthSchema = z.strictObject({
   status: z.literal("ok"),
@@ -6,10 +9,15 @@ export const healthSchema = z.strictObject({
   database: z.literal("ready"),
 });
 
-export const serverMessageSchema = z.strictObject({
+const connectionReadySchema = z.strictObject({
   type: z.literal("connection.ready"),
   protocolVersion: z.literal(1),
 });
+
+export const serverMessageSchema = z.union([
+  connectionReadySchema,
+  runMessageSchema,
+]);
 
 export type Health = z.infer<typeof healthSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;

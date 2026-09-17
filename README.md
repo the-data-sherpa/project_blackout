@@ -6,13 +6,13 @@ and saved recordings, with observable evidence kept separate from scenario truth
 
 ## Current status
 
-The framework foundation is implemented. The app starts a Next.js console and a
-long-running TypeScript backend, opens SQLite, and verifies HTTP and WebSocket
-connections. The page shows connection failures and supports retrying them.
+The console can start one seeded authentication run, show its simulation clock
+and ordered events, and inspect the persisted manifest and start command. Run
+recordings use SQLite; the backend streams each step after it commits.
 
-Simulation runs, telemetry generators, recording schemas, attack controls, and
-Jev evaluation remain in the [MVP backlog](docs/MVP-TICKETS.md). No Jev API key is
-needed to run the foundation.
+This implements the first [MVP ticket](docs/MVP-TICKETS.md). The populated
+organization, recording browser, attack controls, and Jev evaluation remain in
+the backlog. No Jev API key is needed for this slice.
 
 ## Quick start with Docker
 
@@ -25,6 +25,13 @@ docker compose up --build --wait
 Open [localhost:3000](http://localhost:3000). Both connection checks should show
 **Ready**. The backend health endpoint is
 [localhost:3001/api/health](http://localhost:3001/api/health).
+
+Enter a seed and duration, then choose **Start run**. The default run lasts 30
+simulation seconds and records two authentication events per second. **Completed**
+appears when the last step is saved. Expand **Manifest and command log** to inspect
+the inputs. Keep the page's `?run=…` address to reopen that recording; **Refresh
+recording** reloads saved events and reconnects live updates. Closing the browser
+does not stop generation. Starting a new run preserves previous recordings.
 
 ```bash
 docker compose logs -f  # Follow service logs
@@ -101,9 +108,11 @@ npx playwright install chromium
 npm run test:e2e    # Browser tests against the production build
 ```
 
-Vitest checks transport contracts, configuration, and database persistence.
-Playwright checks real connections, failure recovery, keyboard access, and a
-narrow viewport. Browser tests use ports 3100/3101 and an in-memory database.
+Vitest checks transport contracts, configuration, deterministic generation,
+transaction rollback, run isolation, and database persistence. Playwright checks
+start-to-inspect, recording reload, real connections, failure recovery, keyboard
+access, and a narrow viewport. Browser tests use ports 3100/3101 and an in-memory
+database.
 
 GitHub Actions runs these checks and verifies Docker Compose startup. To run the
 production build locally after `npm run build`, stop development or Compose and
@@ -118,5 +127,5 @@ storage behavior.
 - [Full MVP roadmap: milestones M1–M9 and acceptance criteria](docs/MVP-ROADMAP.md)
 - [Published GitHub tickets and blocking dependencies](docs/MVP-TICKETS.md)
 
-The first milestone adds seeded simulation runs and durable recording. The full
-MVP requires milestones M1–M9; the framework setup alone completes no milestone.
+The first milestone covers seeded runs and durable recording. Its restart and
+recording-browser ticket is next. The full MVP requires milestones M1–M9.
