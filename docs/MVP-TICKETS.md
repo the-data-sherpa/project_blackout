@@ -7,8 +7,9 @@ The ticket bodies contain acceptance criteria and blocking references. Native Gi
 
 ## Working order
 
-M1–M3 are implemented. Continue with [#11 — Run the credential-compromise sequence](https://github.com/the-data-sherpa/project_blackout/issues/11).
-The [M3 evaluation guide](JEV-EVALUATION.md) records real-API results, misses, and input revisions.
+M1–M4 are implemented. Continue with [#15 — Pause and resume while inference is in flight](https://github.com/the-data-sherpa/project_blackout/issues/15).
+The [M4 evaluation guide](M4-SCENARIOS.md) records real-API results and unmet targets.
+The [M3 evaluation guide](JEV-EVALUATION.md) preserves earlier results, misses and input revisions.
 Work any ticket whose blocking issues are all complete. A readiness label describes specification readiness; dependencies determine when work can start.
 Milestones are completion checkpoints rather than blanket barriers to independent tickets. All tickets and their acceptance criteria are required for full MVP delivery.
 

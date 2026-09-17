@@ -1,14 +1,16 @@
 # Jev evaluation and the first model slice
 
 M3 implements issues #7–#10 and has real-API smoke and fixture-suite evidence. Software tests
-use an injected transport and do not establish model quality.
+use an injected transport and do not establish model quality. This document preserves
+the M3 input and measurement versions. Current runs use the [M4 input, questions,
+scenarios and metrics](M4-SCENARIOS.md).
 
 ## API and evidence boundary
 
 The server posts to `https://api.typesafe.ai/v1/systemone` using the
 [official HTTP contract](https://docs.typesafe.ai/api). Four typed questions share
 one request: Noul compromise probability, condition Choice, severity Score, and
-advisory response Choice. `security-questions/2` defines the current question/input version.
+advisory response Choice. `security-questions/2` defines the M3 question/input version.
 The default model is pinned to `jev-1.13.0`. Each attempt records the returned
 model identifier. The manifest keeps the latest returned identifier too.
 

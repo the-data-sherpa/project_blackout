@@ -1,6 +1,6 @@
 # PROJECT: BLACKOUT — Full MVP Roadmap
 
-Status: M1–M3 implemented; M4–M9 remain. See [M3 measurements and limitations](JEV-EVALUATION.md).
+Status: M1–M4 implemented; M5–M9 remain. See [M4 scenarios, measurements and limitations](M4-SCENARIOS.md).
 Decision baseline: PRD review accepted by the owner on 2026-09-17.  
 Product specification: [PRD](PRD.md).  
 Implementation backlog: [31 approved GitHub tickets across M1–M9](MVP-TICKETS.md).

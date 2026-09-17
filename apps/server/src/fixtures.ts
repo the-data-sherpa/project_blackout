@@ -1,5 +1,7 @@
 import type { ScenarioTruth, TelemetryManifest } from "@blackout/contracts";
-import { randomBytes, type Observation } from "./telemetry.js";
+import type { Observation } from "./telemetry.js";
+import { randomBytes } from "./random.js";
+import { scenarioObservations } from "./scenarios.js";
 
 // Fixture metadata never enters the aggregator or the observable envelope.
 export function fixtureObservations(
@@ -9,6 +11,8 @@ export function fixtureObservations(
   observations: Observation[];
   truth: Omit<ScenarioTruth, "runId" | "eventSequences"> | null;
 } {
+  if (manifest.scenarioVersion === "scenarios/1")
+    return scenarioObservations(manifest, time);
   if (manifest.fixture === "baseline" || time < 1000 || time > 8000)
     return { observations: [], truth: null };
   const { users, hosts, resources } = manifest.organization;

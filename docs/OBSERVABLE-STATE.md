@@ -1,7 +1,9 @@
 # Observable telemetry and state (M2)
 
-New runs use manifest schema 2, generator `telemetry/1`, scenario `fixtures/1`
-and aggregator `rolling-state/1`. M1 recordings remain readable with their original
+M2 introduced manifest schema 2, generator `telemetry/1`, scenario `fixtures/1`
+and aggregator `rolling-state/1`. Current runs use `rolling-state/2`, with
+recent focus activity; full scenarios use `scenarios/1`. See the
+[M4 extension](M4-SCENARIOS.md#observable-input-and-compatibility). M1 recordings remain readable with their original
 schema and events. SQLite migration 2 adds snapshots and a separate truth table;
 it does not regenerate old recordings.
 
@@ -23,7 +25,7 @@ it does not regenerate old recordings.
 
 The snapshots contain observations and deterministic calculations. Jev evaluation
 is opt-in for M3. The two fixtures are small controls for that first slice; the full
-scenario and interactive attack controls belong to M4 and M5.
+scenario is implemented in M4; interactive attack controls belong to M5.
 
 ## Organization and history
 
@@ -128,7 +130,9 @@ exercise each tie-break and empty evidence, including expiry.
 ## Fixtures and the truth boundary
 
 `POST /api/runs` accepts an optional `fixture`: `baseline` (default),
-`credential-attack` or `harmless-anomaly`. The manifest and start command record
+`credential-attack` or `harmless-anomaly` for the M2 fixtures. M4 also accepts
+`credential-compromise` and `benign-maintenance`; their [schedule and stop option](M4-SCENARIOS.md)
+are documented separately. The manifest and start command record
 the choice. No target, truth label, custom event or arbitrary scenario name is
 accepted through this endpoint.
 
@@ -146,8 +150,9 @@ through `GET /api/runs/:id/truth`. The console loads it explicitly in the scenar
 metadata section. Ordinary recordings and WebSocket updates contain no truth rows.
 The manifest does contain run controls and fixture choice; it is not evaluator input.
 
-`evaluatorInputSchema` is a strict allowlist with only `schemaVersion`,
-`simulationTimeMs`, `windows` and `focus`. Nested structures are strict too. The
+Version 1 of `evaluatorInputSchema` is a strict allowlist with `schemaVersion`,
+`simulationTimeMs`, `windows` and `focus`. Version 2 adds the bounded, observed
+`focusActivity` groups described in the [M4 guide](M4-SCENARIOS.md). Nested structures are strict too. The
 aggregator accepts an organization, observations and a simulation time, never a
 manifest, command, fixture or truth record. The snapshot wrapper carries recording
 IDs and a wall timestamp. M3 derives a strict compact model payload from `.input`,

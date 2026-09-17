@@ -5,7 +5,48 @@ export const fixtureSchema = z.enum([
   "baseline",
   "credential-attack",
   "harmless-anomaly",
+  "credential-compromise",
+  "benign-maintenance",
 ]);
+export const scenarioStageSchema = z.enum([
+  "weak-signal",
+  "increasing-failures",
+  "unusual-success",
+  "resource-access",
+  "discovery",
+  "lateral-movement",
+  "sign-in",
+  "document-transfer",
+  "department-sync",
+]);
+export const scenarioPlanSchema = z.strictObject({
+  version: z.literal("scenarios/1"),
+  targetUserId: z.string().min(1),
+  entryHostId: z.string().min(1),
+  secondHostId: z.string().min(1),
+  resourceId: z.string().min(1),
+  location: z.string().min(1),
+  stopAtMs: z.number().int().min(1000).max(35_000).multipleOf(1000),
+  stages: z
+    .array(
+      z.strictObject({
+        name: scenarioStageSchema,
+        startMs: z.number().int().nonnegative().multipleOf(1000),
+        endExclusiveMs: z.number().int().positive().multipleOf(1000),
+      }),
+    )
+    .min(1)
+    .max(6)
+    .refine(
+      (stages) =>
+        stages.every(
+          (stage, index) =>
+            stage.startMs < stage.endExclusiveMs &&
+            (index === 0 || stages[index - 1]!.endExclusiveMs <= stage.startMs),
+        ),
+      "Stages must be ordered without overlaps",
+    ),
+});
 const entityId = z.string().min(1);
 export const profileSchema = z.strictObject({
   userId: entityId,
@@ -128,12 +169,62 @@ export const focusSchema = z.strictObject({
 });
 // This is the ONLY contract the evaluator may receive. Construct it explicitly;
 // never spread a run, manifest, command, snapshot wrapper or truth into it.
-export const evaluatorInputSchema = z.strictObject({
+const legacyEvaluatorInputSchema = z.strictObject({
   schemaVersion: z.literal("observable-state/1"),
   simulationTimeMs: z.number().int().nonnegative(),
   windows: z.array(windowSchema).length(5),
   focus: focusSchema.nullable(),
 });
+// A bounded, evidence-derived account of the focus identity's recent activity.
+// These fields describe observations, never scenario intent.
+export const activityObservationSchema = z.discriminatedUnion("type", [
+  telemetryAuthenticationSchema.pick({
+    type: true,
+    userId: true,
+    hostId: true,
+    resource: true,
+    sourceIp: true,
+    location: true,
+    outcome: true,
+  }),
+  dnsEventSchema.pick({
+    type: true,
+    userId: true,
+    hostId: true,
+    query: true,
+    outcome: true,
+    answerIp: true,
+  }),
+  networkEventSchema.pick({
+    type: true,
+    userId: true,
+    hostId: true,
+    destinationHostId: true,
+    destinationPort: true,
+    bytesSent: true,
+    outcome: true,
+  }),
+]);
+export const activityGroupSchema = z.strictObject({
+  observation: activityObservationSchema,
+  count: z.number().int().positive(),
+  firstSimulationMs: z.number().int(),
+  lastSimulationMs: z.number().int(),
+  evidenceSequences: z.array(z.number().int().positive()),
+});
+export const focusActivitySchema = z.strictObject({
+  windowMs: z.literal(30_000),
+  totalEvents: z.number().int().nonnegative(),
+  omittedGroups: z.number().int().nonnegative(),
+  groups: z.array(activityGroupSchema).max(16),
+});
+export const evaluatorInputSchema = z.discriminatedUnion("schemaVersion", [
+  legacyEvaluatorInputSchema,
+  legacyEvaluatorInputSchema.extend({
+    schemaVersion: z.literal("observable-state/2"),
+    focusActivity: focusActivitySchema,
+  }),
+]);
 export const observableSnapshotSchema = z.strictObject({
   id: z.string().regex(/^snapshot-\d{6,}$/),
   runId: z.uuid(),
@@ -148,7 +239,10 @@ export const scenarioTruthSchema = z.strictObject({
   targetUserId: entityId,
   interpretation: z.enum(["credential-misuse", "authorized-burst"]),
   eventSequences: z.array(z.number().int().positive()),
+  stage: z.union([scenarioStageSchema, z.literal("stopped")]).optional(),
 });
+export type ScenarioPlan = z.infer<typeof scenarioPlanSchema>;
+export type FocusActivity = z.infer<typeof focusActivitySchema>;
 export type Fixture = z.infer<typeof fixtureSchema>;
 export type Organization = z.infer<typeof organizationSchema>;
 export type UserProfile = z.infer<typeof profileSchema>;

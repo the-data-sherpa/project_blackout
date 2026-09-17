@@ -22,7 +22,13 @@ export const metricDefinitions = {
   tokens:
     "Sum of returned usage fields over attemptsWithUsage. Missing usage and interrupted attempts are not estimated.",
   scope:
-    "Synthetic first-slice fixtures and fixed thresholds. This report does not establish calibrated confidence or real-world security effectiveness.",
+    "Synthetic scenarios and fixed thresholds. This report does not establish calibrated confidence or real-world security effectiveness. Stopping injection and declining activity do not establish remediation.",
+  suspicion:
+    "First successful checkpoint at/after the first malicious observation with compromise probability >= 0.5. Delays use the same simulation and wall origins as detection. Not exposed means no malicious observations were emitted. A miss requires every checkpoint to succeed; suspicion does not require policy fields.",
+  activityDecline:
+    "From the recorded stop-injection command: probabilityChange = terminal checkpoint probability minus last checkpoint strictly before stop. Either failed endpoint yields null; no earlier result is substituted. Post-stop denominators include the stop checkpoint. First low delay uses probability < 0.2 and simulation time since stop / response completion minus the stop command recordedAt. Low risk is not remediation; longer windows retain history.",
+  control:
+    "falseIncidentDecisions / controlCheckpoints counts policy-evaluable successes over all baseline/benign checkpoints and checkpoints strictly before the first malicious observation in attack runs. Failed or unevaluable policies are excluded. Detection still starts at the first malicious observation.",
 };
 
 export function createEvaluationReport(
@@ -31,7 +37,7 @@ export function createEvaluationReport(
   return evaluationReportSchema.parse({
     id: randomUUID(),
     createdAt: new Date().toISOString(),
-    metricVersion: "slice-metrics/2",
+    metricVersion: "scenario-metrics/1",
     definitions: metricDefinitions,
     runs: records.map(({ recording, truth }) => {
       const { run, attempts } = recording;
@@ -69,8 +75,11 @@ export function createEvaluationReport(
         (attempt) => attempt.policy?.outcome === "incident_advisory",
       );
       const firstMalicious =
-        truth.find((row) => row.interpretation === "credential-misuse")
-          ?.simulationTimeMs ?? null;
+        truth.find(
+          (row) =>
+            row.interpretation === "credential-misuse" &&
+            row.eventSequences.length > 0,
+        )?.simulationTimeMs ?? null;
       const detection =
         firstMalicious === null
           ? undefined
@@ -80,6 +89,63 @@ export function createEvaluationReport(
       const onsetTimestamp = recording.snapshots.find(
         (snapshot) => snapshot.simulationTimeMs === firstMalicious,
       )?.recordedAt;
+      const attack =
+        manifest.fixture === "credential-attack" ||
+        manifest.fixture === "credential-compromise";
+      const suspicion =
+        firstMalicious === null
+          ? undefined
+          : successful.find(
+              (attempt) =>
+                attempt.simulationTimeMs >= firstMalicious &&
+                attempt.response!.answers.compromise.noul >= 0.5,
+            );
+      const wallDelay = (attempt: typeof detection, origin = onsetTimestamp) =>
+        attempt && origin
+          ? Math.max(0, Date.parse(attempt.completedAt!) - Date.parse(origin))
+          : null;
+      const outcome = (found: typeof detection, needsPolicy: boolean) =>
+        !attack
+          ? "not_applicable"
+          : firstMalicious === null
+            ? "not_exposed"
+            : found
+              ? "detected"
+              : successful.length !== checkpoints.length ||
+                  (needsPolicy && unevaluable > 0)
+                ? "incomplete"
+                : "miss";
+      const controls = successful.filter(
+        (attempt) =>
+          attempt.policy?.outcome !== "unevaluable" &&
+          (!attack ||
+            firstMalicious === null ||
+            attempt.simulationTimeMs < firstMalicious),
+      );
+      const stop = recording.commands.find(
+        (command) => command.type === "stop-injection",
+      );
+      const postStop = stop
+        ? checkpoints.filter(
+            (attempt) => attempt.simulationTimeMs >= stop.simulationTimeMs,
+          )
+        : [];
+      const reference = stop
+        ? checkpoints
+            .filter(
+              (attempt) => attempt.simulationTimeMs < stop.simulationTimeMs,
+            )
+            .at(-1)
+        : undefined;
+      const terminal = checkpoints.at(-1);
+      const referenceProbability =
+        reference?.response?.answers.compromise.noul ?? null;
+      const finalProbability =
+        terminal?.response?.answers.compromise.noul ?? null;
+      const firstLow = postStop.find(
+        (attempt) =>
+          attempt.response && attempt.response.answers.compromise.noul < 0.2,
+      );
       const latency = attempts
         .filter(
           (attempt) =>
@@ -107,6 +173,8 @@ export function createEvaluationReport(
         seed: manifest.seed,
         fixture: manifest.fixture,
         questionVersion: manifest.evaluatorVersion,
+        scenarioVersion: manifest.scenarioVersion,
+        aggregatorVersion: manifest.aggregatorVersion,
         requestedModel: manifest.requestedModel,
         returnedModels: [
           ...new Set(successful.map((attempt) => attempt.response!.model)),
@@ -138,14 +206,43 @@ export function createEvaluationReport(
                 Date.parse(detection.completedAt!) - Date.parse(onsetTimestamp),
               )
             : null,
-        attackOutcome:
-          manifest.fixture !== "credential-attack"
-            ? "not_applicable"
-            : detection
-              ? "detected"
-              : successful.length !== checkpoints.length || unevaluable > 0
-                ? "incomplete"
-                : "miss",
+        attackOutcome: outcome(detection, true),
+        suspicionThreshold: 0.5,
+        suspicionDelaySimulationMs: suspicion
+          ? suspicion.simulationTimeMs - firstMalicious!
+          : null,
+        suspicionDelayWallMs: wallDelay(suspicion),
+        suspicionOutcome: outcome(suspicion, false),
+        controlCheckpoints: controls.length,
+        falseIncidentDecisions: controls.filter(
+          (attempt) => attempt.policy?.outcome === "incident_advisory",
+        ).length,
+        activityDecline: stop
+          ? {
+              stopSimulationMs: stop.simulationTimeMs,
+              stopRecordedAt: stop.recordedAt,
+              lowProbabilityThreshold: 0.2,
+              referenceAttemptId: reference?.id ?? null,
+              referenceProbability,
+              finalAttemptId: terminal?.id ?? null,
+              finalProbability,
+              probabilityChange:
+                referenceProbability === null || finalProbability === null
+                  ? null
+                  : finalProbability - referenceProbability,
+              postStopCheckpoints: postStop.length,
+              successfulCheckpoints: postStop.filter(
+                (attempt) => attempt.status === "succeeded",
+              ).length,
+              failedCheckpoints: postStop.filter(
+                (attempt) => attempt.status === "failed",
+              ).length,
+              firstLowDelaySimulationMs: firstLow
+                ? firstLow.simulationTimeMs - stop.simulationTimeMs
+                : null,
+              firstLowDelayWallMs: wallDelay(firstLow, stop.recordedAt),
+            }
+          : null,
         classificationSwitches: switches,
         comparablePairs: pairs,
         latencyMs: {
@@ -172,6 +269,9 @@ export function createEvaluationReport(
           classification:
             attempt.response?.answers.classification.choice ?? null,
           error: attempt.error?.code ?? null,
+          compromiseProbability:
+            attempt.response?.answers.compromise.noul ?? null,
+          completedAt: attempt.completedAt,
         })),
       };
     }),

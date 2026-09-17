@@ -4,10 +4,12 @@ import {
   aggregateMetricSchema,
   windowSchema,
   focusSchema,
+  focusActivitySchema,
+  activityGroupSchema,
   type EvaluatorInput,
 } from "./telemetry.js";
 
-export const modelStateSchema = z.strictObject({
+const legacyModelStateSchema = z.strictObject({
   schemaVersion: z.literal("observable-summary/1"),
   simulationTimeMs: z.number().int().nonnegative(),
   windows: z
@@ -23,6 +25,17 @@ export const modelStateSchema = z.strictObject({
     .omit({ evidenceSequences: true, rule: true, score: true })
     .nullable(),
 });
+export const modelStateSchema = z.discriminatedUnion("schemaVersion", [
+  legacyModelStateSchema,
+  legacyModelStateSchema.extend({
+    schemaVersion: z.literal("observable-summary/2"),
+    focusActivity: focusActivitySchema.extend({
+      groups: z
+        .array(activityGroupSchema.omit({ evidenceSequences: true }))
+        .max(16),
+    }),
+  }),
+]);
 
 // Evidence IDs and selection rules stay in the snapshot for local inspection.
 export function summarizeInput(
@@ -31,7 +44,25 @@ export function summarizeInput(
   const input = evaluatorInputSchema.parse(value);
   const focus = input.focus;
   return modelStateSchema.parse({
-    schemaVersion: "observable-summary/1",
+    schemaVersion:
+      input.schemaVersion === "observable-state/2"
+        ? "observable-summary/2"
+        : "observable-summary/1",
+    ...(input.schemaVersion === "observable-state/2"
+      ? {
+          focusActivity: {
+            windowMs: input.focusActivity.windowMs,
+            totalEvents: input.focusActivity.totalEvents,
+            omittedGroups: input.focusActivity.omittedGroups,
+            groups: input.focusActivity.groups.map((group) => ({
+              observation: group.observation,
+              count: group.count,
+              firstSimulationMs: group.firstSimulationMs,
+              lastSimulationMs: group.lastSimulationMs,
+            })),
+          },
+        }
+      : {}),
     simulationTimeMs: input.simulationTimeMs,
     windows: input.windows.map((window) => ({
       durationMs: window.durationMs,
@@ -189,7 +220,11 @@ export const inferenceAttemptSchema = z
     runId: z.uuid(),
     snapshotId: text,
     simulationTimeMs: z.number().int().nonnegative(),
-    questionVersion: z.enum(["security-questions/1", "security-questions/2"]),
+    questionVersion: z.enum([
+      "security-questions/1",
+      "security-questions/2",
+      "security-questions/3",
+    ]),
     attemptNumber: z.number().int().min(1).max(2),
     request: jevRequestSchema,
     status: z.enum(["pending", "succeeded", "failed"]),

@@ -4,11 +4,13 @@
 
 The app starts seeded synthetic organizations with recorded baseline history,
 authentication, host metrics, DNS and network telemetry. Rolling snapshots retain
-the evidence behind every aggregate and the focus identity. Two minimal fixtures
-support comparison while scenario truth stays separate. Stored runs remain
+the evidence behind every aggregate and the focus identity. The full credential
+compromise and benign maintenance scenarios join two minimal comparison fixtures;
+scenario truth stays separate. Stored runs remain
 inspectable after restart. Bounded runs complete automatically. Opt-in Jev evaluation
 records model decisions and policies; interactive attack controls arrive in M5.
-See [Jev evaluation](JEV-EVALUATION.md) for contracts, pacing, and the report runner.
+See [Jev evaluation](JEV-EVALUATION.md) for pacing and earlier reports, and
+[M4 scenarios](M4-SCENARIOS.md) for current input contracts, schedules and the runner.
 
 See [observable state](OBSERVABLE-STATE.md) for the M2 walkthrough, exact window
 boundaries, focus rule, fixture behavior and truth boundary.
@@ -132,7 +134,9 @@ a separate Compose startup check.
 New runs use manifest schema 2 and a 32-user, 16-host organization. The start
 transaction records 15 minutes of warm-up history and an initial snapshot alongside
 the manifest and start command. Five baseline observations arrive each second;
-fixtures add events during seconds 1–8. See the [state rules](OBSERVABLE-STATE.md)
+minimal fixtures add events during seconds 1–8. Full scenarios inject during
+seconds 5–34 and stop at 35 s while baseline continues. See the
+[state rules](OBSERVABLE-STATE.md) and [M4 schedule](M4-SCENARIOS.md)
 for exact generation, sequencing, aggregation and comparison behavior.
 
 The manifest records seed, initial entity lists and profiles, fixed simulation
@@ -145,11 +149,14 @@ Each delivered timer callback advances exactly 1,000 simulation milliseconds.
 Late callbacks slow progression; they cannot skip steps or alter event order.
 The first live events arrive at 1,000 ms, and the last step is at the chosen duration.
 A start command records time zero, command sequence 1 and its fixture selection.
+Full scenarios also record scheduled `begin-injection` and `stop-injection`
+commands at their applied simulation times. Their plan is saved in the manifest.
 Completion is automatic and does not invent an operator command.
 
 The backend is the sole database writer; run only one backend per database file.
 A partial unique index also prevents two active rows. Each transaction saves events,
-snapshot, truth, clock and terminal status before publishing its WebSocket update.
+snapshot, truth, scheduled commands, clock and terminal status before publishing
+its WebSocket update.
 A write failure rolls back that entire step and stops generation. Failure status
 is saved if storage permits; `recording.error` reports the failure even if that
 status cannot be saved. The frontend retains only saved events and snapshots.
@@ -177,14 +184,14 @@ reports `recording.error` to subscribers, including newly connected subscribers.
 After storage is repaired, restart marks that unfinished run interrupted. Invalid
 stored payloads return a storage error, rather than blaming the request input.
 
-| API                               | Behavior                                                                                                                                                                                                                                                                                                 |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/runs`                  | Strict JSON `{ "seed": "demo", "durationSeconds": 30, "fixture": "baseline" }`; seed is 1–128 trimmed characters, duration is an integer from 1–120 (default 30). Fixture defaults to `baseline`; also accepts `credential-attack` or `harmless-anomaly`. Returns the committed recording with HTTP 201. |
-| `GET /api/runs?offset=0&limit=20` | Lists run summaries, total count, next offset, and active run ID. Limit accepts 1–100; offset accepts 0–1,000,000. It does not load event bodies.                                                                                                                                                        |
-| `GET /api/runs/active`            | Returns `{ "runId": "…" }` or `{ "runId": null }`.                                                                                                                                                                                                                                                       |
-| `GET /api/runs/:id`               | Returns the manifest, status, clock, ordered events, commands and snapshots from SQLite; no truth rows.                                                                                                                                                                                                  |
-| `GET /api/runs/:id/truth`         | Returns `{ "records": [...] }` from the separate truth table for explicit fixture evaluation.                                                                                                                                                                                                            |
-| `GET /ws?runId=<uuid>`            | Sends `connection.ready`, a full saved `run.snapshot`, then committed `run.updated` event batches with their snapshot or `recording.error`. Omitting `runId` gives only the connection check.                                                                                                            |
+| API                               | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /api/runs`                  | Strict JSON `{ "seed": "demo", "durationSeconds": 30, "fixture": "baseline" }`; seed is 1–128 trimmed characters, duration is an integer from 1–120 (default 30). Fixture defaults to `baseline`; also accepts `credential-attack`, `harmless-anomaly`, `credential-compromise` or `benign-maintenance`. Full scenarios accept `stopInjectionAtSeconds` (1–35, within the run); `evaluate: true` enables Jev. Returns the committed recording with HTTP 201. |
+| `GET /api/runs?offset=0&limit=20` | Lists run summaries, total count, next offset, and active run ID. Limit accepts 1–100; offset accepts 0–1,000,000. It does not load event bodies.                                                                                                                                                                                                                                                                                                            |
+| `GET /api/runs/active`            | Returns `{ "runId": "…" }` or `{ "runId": null }`.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `GET /api/runs/:id`               | Returns the manifest, status, clock, ordered events, commands and snapshots from SQLite; no truth rows.                                                                                                                                                                                                                                                                                                                                                      |
+| `GET /api/runs/:id/truth`         | Returns `{ "records": [...] }` from the separate truth table for explicit fixture evaluation.                                                                                                                                                                                                                                                                                                                                                                |
+| `GET /ws?runId=<uuid>`            | Sends `connection.ready`, a full saved `run.snapshot`, then committed `run.updated` event batches with their snapshot and any applied commands, `inference.updated` attempts, or `recording.error`. Omitting `runId` gives only the connection check.                                                                                                                                                                                                        |
 
 Malformed requests return HTTP 400, a second active run returns 409, missing
 recordings return 404, and storage failures return 503. Unknown request fields

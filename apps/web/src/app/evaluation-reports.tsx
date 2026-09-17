@@ -68,7 +68,8 @@ export function EvaluationReports({ backendUrl }: { backendUrl: string }) {
           className="mt-3 min-w-0 rounded border border-slate-600 p-4"
         >
           <summary className="cursor-pointer break-words">
-            {report.createdAt} · {report.runs.length} runs
+            {report.createdAt} · {report.runs.length} runs ·{" "}
+            {report.metricVersion}
           </summary>
           <p className="my-3 text-sm text-slate-300">
             {report.definitions.scope}
@@ -138,6 +139,55 @@ export function EvaluationReports({ backendUrl }: { backendUrl: string }) {
               <summary className="cursor-pointer text-sm">
                 Decisions: {run.fixture} · {run.seed}
               </summary>
+              {run.suspicionOutcome && (
+                <p className="mt-3 text-sm text-slate-300">
+                  Suspicion (probability ≥ {run.suspicionThreshold}):{" "}
+                  {run.suspicionOutcome}. Delay:{" "}
+                  {run.suspicionDelaySimulationMs ?? "—"} ms simulation /{" "}
+                  {run.suspicionDelayWallMs ?? "—"} ms wall. False incident
+                  advisories: {run.falseIncidentDecisions} /{" "}
+                  {run.controlCheckpoints} evaluable control checkpoints.
+                  Classification switches: {run.classificationSwitches} /{" "}
+                  {run.comparablePairs} adjacent successful pairs.
+                </p>
+              )}
+              {run.activityDecline && (
+                <div className="mt-3 rounded border border-slate-600 p-3 text-sm text-slate-300">
+                  <p>
+                    Injection stopped at{" "}
+                    {run.activityDecline.stopSimulationMs / 1000} s. Baseline
+                    continued.
+                  </p>
+                  <p className="mt-2">
+                    Compromise probability:{" "}
+                    {run.activityDecline.referenceProbability?.toFixed(3) ??
+                      "Unknown"}{" "}
+                    before stop →{" "}
+                    {run.activityDecline.finalProbability?.toFixed(3) ??
+                      "Unknown"}{" "}
+                    at run end. Change:{" "}
+                    {run.activityDecline.probabilityChange?.toFixed(3) ??
+                      "Unknown"}
+                    .
+                  </p>
+                  <p className="mt-2">
+                    Post-stop responses:{" "}
+                    {run.activityDecline.successfulCheckpoints} /{" "}
+                    {run.activityDecline.postStopCheckpoints};{" "}
+                    {run.activityDecline.failedCheckpoints} failed. First
+                    probability below{" "}
+                    {run.activityDecline.lowProbabilityThreshold}:{" "}
+                    {run.activityDecline.firstLowDelaySimulationMs ?? "—"} ms
+                    simulation /{" "}
+                    {run.activityDecline.firstLowDelayWallMs ?? "—"} ms wall
+                    after stop.
+                  </p>
+                  <p className="mt-2 text-amber-200">
+                    Declining activity does not establish remediation. Longer
+                    windows retain earlier evidence.
+                  </p>
+                </div>
+              )}
               <ul className="mt-3 space-y-2 text-sm">
                 {run.decisions.map((decision) => (
                   <li key={decision.attemptId}>
@@ -148,6 +198,8 @@ export function EvaluationReports({ backendUrl }: { backendUrl: string }) {
                       {decision.simulationTimeMs / 1000}s · {decision.status} ·{" "}
                       {decision.classification ?? decision.error} ·{" "}
                       {decision.outcome}
+                      {decision.compromiseProbability !== undefined &&
+                        ` · probability ${decision.compromiseProbability?.toFixed(3) ?? "unknown"}`}
                     </a>
                   </li>
                 ))}

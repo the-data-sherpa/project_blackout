@@ -20,12 +20,12 @@ export const defaultEvaluation: EvaluationConfig = {
   maxAttempts: 2,
   retryDelayMs: 1000,
 };
-export const questionVersion = "security-questions/2";
+export const questionVersion = "security-questions/3";
 export const questions: JevRequest["questions"] = {
   compromise: {
     type: "noul",
     instructions:
-      "Does the observable telemetry indicate active credential compromise? Use the recent focus identity and rolling windows; unusual authorized behavior alone is insufficient. Larger windows contain historical activity, not necessarily current activity.",
+      "Does the observable telemetry indicate active credential compromise? Use the recent focus identity, its observed authentication/DNS/network groups, and rolling windows; unusual authorized behavior alone is insufficient. Groups include counts and first/last observation times within 30 seconds; at most 16 most recent groups are shown and omittedGroups discloses truncation. Larger windows contain historical activity, not necessarily current activity. Falling activity does not establish remediation.",
     criteria: {
       true: "Evidence supports unauthorized credential use.",
       false:

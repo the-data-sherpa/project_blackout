@@ -4,8 +4,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import { evaluationReportSchema, recordingSchema } from "@blackout/contracts";
 
 const flags = process.argv.slice(2);
-if (flags.some((flag) => flag !== "--smoke"))
-  throw new Error("Usage: npm run evaluate [-- --smoke]");
+if (flags.some((flag) => !["--smoke", "--m4"].includes(flag)))
+  throw new Error("Usage: npm run evaluate [-- --m4] [--smoke]");
 const base = process.env.BLACKOUT_API_URL ?? "http://localhost:3001";
 async function api(path, body) {
   const response = await fetch(new URL(path, base), {
@@ -34,11 +34,22 @@ if ((await api("/api/runs/active")).runId)
     "Wait for the active run to complete before starting the suite.",
   );
 const smoke = flags.includes("--smoke");
-const seeds = smoke ? ["m3-smoke-001"] : ["m3-001", "m3-002", "m3-003"];
-const fixtures = smoke
-  ? ["credential-attack"]
-  : ["baseline", "credential-attack", "harmless-anomaly"];
-const durationSeconds = smoke ? 6 : 20;
+const m4 = flags.includes("--m4");
+const seeds = m4
+  ? smoke
+    ? ["m4-smoke-001"]
+    : ["m4-001", "m4-002", "m4-003"]
+  : smoke
+    ? ["m3-smoke-001"]
+    : ["m3-001", "m3-002", "m3-003"];
+const fixtures = m4
+  ? smoke
+    ? ["credential-compromise"]
+    : ["baseline", "credential-compromise", "benign-maintenance"]
+  : smoke
+    ? ["credential-attack"]
+    : ["baseline", "credential-attack", "harmless-anomaly"];
+const durationSeconds = m4 ? 95 : smoke ? 6 : 20;
 const checkpoints =
   Math.ceil((durationSeconds * 1000) / evaluator.config.checkpointMs) + 1;
 console.log(
@@ -53,6 +64,7 @@ for (const seed of seeds) {
         fixture,
         durationSeconds,
         evaluate: true,
+        ...(m4 && fixture !== "baseline" ? { stopInjectionAtSeconds: 35 } : {}),
       }),
     );
     const id = recording.run.id;
@@ -101,7 +113,11 @@ const failures = report.runs.reduce(
 );
 console.log(
   `Failed checkpoints: ${failures}. Attack outcomes: ${report.runs
-    .filter((run) => run.fixture === "credential-attack")
+    .filter(
+      (run) =>
+        run.fixture === "credential-attack" ||
+        run.fixture === "credential-compromise",
+    )
     .map((run) => `${run.seed}=${run.attackOutcome}`)
     .join(", ")}.`,
 );

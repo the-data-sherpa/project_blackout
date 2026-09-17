@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   telemetryEventSchema,
   telemetryManifestSchema,
@@ -7,6 +6,9 @@ import {
   type TelemetryEvent,
   type TelemetryManifest,
 } from "@blackout/contracts";
+import { createScenarioPlan } from "./scenarios.js";
+import { randomBytes } from "./random.js";
+export { randomBytes } from "./random.js";
 
 type WithoutEnvelope<T> = T extends TelemetryEvent
   ? Omit<
@@ -22,9 +24,6 @@ type WithoutEnvelope<T> = T extends TelemetryEvent
   : never;
 export type Observation = WithoutEnvelope<TelemetryEvent>;
 
-export function randomBytes(...position: unknown[]) {
-  return createHash("sha256").update(JSON.stringify(position)).digest();
-}
 const id = (prefix: string, index: number) =>
   `${prefix}-${String(index + 1).padStart(3, "0")}`;
 
@@ -71,6 +70,7 @@ function createOrganization(seed: string): Organization {
 
 export function createTelemetryManifest(input: StartRun): TelemetryManifest {
   const organization = createOrganization(input.seed);
+  const scenario = createScenarioPlan(input, organization);
   return telemetryManifestSchema.parse({
     seed: input.seed,
     durationSeconds: input.durationSeconds,
@@ -83,10 +83,11 @@ export function createTelemetryManifest(input: StartRun): TelemetryManifest {
       resources: organization.resources.map((resource) => resource.id),
     },
     organization,
+    ...(scenario ? { scenario } : {}),
     warmupMs: 900_000,
     generatorVersion: "telemetry/1",
-    scenarioVersion: "fixtures/1",
-    aggregatorVersion: "rolling-state/1",
+    scenarioVersion: scenario ? "scenarios/1" : "fixtures/1",
+    aggregatorVersion: "rolling-state/2",
     schemaVersion: 2,
     policyVersion: null,
     evaluatorVersion: null,

@@ -6,14 +6,14 @@ and saved recordings, with observable evidence kept separate from scenario truth
 
 ## Current status
 
-M1–M3 are implemented, including a real Jev smoke run and saved fixture reports.
+M1–M4 are implemented, including the full scenario, benign control, and saved Jev reports.
 The console starts a seeded 32-user, 16-host
 organization with 15 minutes of recorded baseline history. It streams authentication,
 host metrics, DNS and network events, and records five rolling windows with
 inspectable evidence and a focus identity chosen from observed activity.
 
-Choose baseline, a minimal credential attack or a harmless anomaly to compare
-their observable state. Scenario truth stays separate from the evaluator input.
+Choose baseline, the full credential-compromise sequence, or benign maintenance
+to compare observable state. The smaller M3 fixtures remain available. Scenario truth stays separate from the evaluator input.
 Stored runs survive restart. Unfinished runs become **Interrupted**. M1 recordings
 remain readable.
 
@@ -23,6 +23,7 @@ API failures stay visible and do not become low-risk decisions.
 
 See the [M2 walkthrough and state rules](docs/OBSERVABLE-STATE.md).
 See the [M3 evaluator and measurement guide](docs/JEV-EVALUATION.md).
+See the [M4 scenarios, schedule and evaluation](docs/M4-SCENARIOS.md).
 
 ## Quick start with Docker
 
@@ -38,7 +39,9 @@ Open [localhost:3000](http://localhost:3000). Both connection checks should show
 
 Enter a seed and duration, then choose **Start run**. The default run lasts 30
 simulation seconds and records five baseline events per second, plus warm-up history.
-Choose a comparison fixture to inject additional activity during seconds 1–8. **Completed**
+The full attack and benign control inject activity during seconds 5–34 and stop at
+35 seconds; choosing either sets a 95-second duration to observe continued baseline.
+The smaller fixtures inject during seconds 1–8. **Completed**
 appears when the backend saves the last step. Expand **Manifest and command log** to inspect
 the inputs.
 
@@ -146,6 +149,27 @@ misses. The six control runs produced zero incident advisories across 30
 checkpoints. These results do not establish detection effectiveness.
 The [saved report](docs/evaluations/m3-follow-up-suite.json) preserves every outcome.
 
+## Evaluate the full scenario
+
+```bash
+npm run evaluate -- --m4 --smoke # One full attack, 20 checkpoints
+npm run evaluate -- --m4         # Three seeds × baseline/attack/benign, 180 checkpoints
+```
+
+Each run lasts 95 simulation seconds; injection stops at 35 seconds while baseline
+continues. The suite uses at most 360 requests with default retries. Reports
+include suspicion and detection delays, control false advisories, classification
+switches, and probability changes after cessation. Failed endpoints remain unknown.
+Open **Model evaluation reports**, expand a run’s decisions, and follow links to
+exact attempts. Declining activity does not establish remediation. See the
+[M4 guide and measured targets](docs/M4-SCENARIOS.md) for definitions and results.
+
+The September 17, 2026 suite returned 180/180 valid responses. All three attacks
+produced incident advisories within 15–20 simulation seconds of onset, with zero
+false advisories across 123 control checkpoints. Attack probabilities declined
+but none fell below 0.2 after injection stopped. The separate smoke run detected
+only after cessation; its result is preserved alongside the full suite.
+
 ## Frameworks
 
 - **Web:** Next.js App Router, React, TypeScript, Tailwind CSS.
@@ -207,5 +231,5 @@ storage behavior.
 - [Full MVP roadmap: milestones M1–M9 and acceptance criteria](docs/MVP-ROADMAP.md)
 - [Published GitHub tickets and blocking dependencies](docs/MVP-TICKETS.md)
 
-The next milestone, M4, adds the complete credential-compromise scenario.
+The next milestone, M5, adds interactive attack, pause/resume, speed and reconnect controls.
 The full MVP requires milestones M1–M9.

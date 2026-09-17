@@ -15,6 +15,7 @@ import {
   orderObservations,
 } from "./telemetry.js";
 import { fixtureObservations } from "./fixtures.js";
+import { scheduledCommands } from "./scenarios.js";
 import { createSnapshot } from "./aggregation.js";
 import { Recordings } from "./recordings.js";
 import {
@@ -125,6 +126,7 @@ export class Runs {
       if (manifest.schemaVersion !== 2)
         throw new Error("Legacy runs cannot resume generation");
       const fixture = fixtureObservations(manifest, simulationTimeMs);
+      const commands = scheduledCommands(manifest, run.id, simulationTimeMs);
       const observations = orderObservations(manifest, simulationTimeMs, [
         ...baselineObservations(manifest, simulationTimeMs),
         ...fixture.observations,
@@ -179,8 +181,9 @@ export class Runs {
         run: updated,
         events,
         snapshot,
+        ...(commands.length ? { commands } : {}),
       });
-      this.recordings.commit(updated, events, snapshot, truth);
+      this.recordings.commit(updated, events, snapshot, truth, commands);
       this.evidence = finished ? [] : evidence;
       this.current = finished ? null : updated;
     } catch {

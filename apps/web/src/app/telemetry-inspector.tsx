@@ -461,6 +461,32 @@ export function TelemetryInspector({
               </>
             )}
           </div>
+          {snapshot.input.schemaVersion === "observable-state/2" && (
+            <details className="my-4 rounded border border-slate-600 p-4">
+              <summary className="cursor-pointer font-medium">
+                Focus activity: authentication, DNS and network
+              </summary>
+              <p className="my-3 text-sm text-slate-300">
+                Last 30 seconds: {snapshot.input.focusActivity.totalEvents}{" "}
+                observations; {snapshot.input.focusActivity.groups.length}{" "}
+                groups shown, {snapshot.input.focusActivity.omittedGroups} older
+                groups omitted. The input keeps the most recent groups of
+                matching observations. Their evidence appears below in sequence
+                order.
+              </p>
+              <EventTable
+                events={recording.events.filter(
+                  (event) =>
+                    snapshot.input.schemaVersion === "observable-state/2" &&
+                    snapshot.input.focusActivity.groups.some((group) =>
+                      group.evidenceSequences.includes(event.sequence),
+                    ),
+                )}
+                label="Focus activity observations"
+                testId="activity-row"
+              />
+            </details>
+          )}
           <h4 className="mb-3 font-medium" data-testid="evidence-title">
             {showFocus
               ? `Focus evidence · ${focus?.userId ?? "none"} · (${seconds(snapshot.simulationTimeMs - 30_000)}, ${seconds(snapshot.simulationTimeMs)}]`
@@ -477,9 +503,10 @@ export function TelemetryInspector({
               Allowlisted evaluator input
             </summary>
             <p className="mt-3 text-sm text-slate-400">
-              This is the recorded observable payload for future evaluation. No
-              model has evaluated it. Event sequences link to this recording;
-              scenario metadata is excluded.
+              This snapshot contains observable evidence. The Decision Inspector
+              shows whether Jev evaluated it and the exact request it received.
+              Event sequences link to this recording; scenario metadata is
+              excluded.
             </p>
             <pre
               data-testid="evaluator-input"
@@ -559,8 +586,13 @@ export function TelemetryInspector({
             Scenario metadata (excluded from model input)
           </summary>
           <p className="my-3 text-sm text-slate-300">
-            Selected fixture: {manifest.fixture}. Injection runs from 1–8 s;
-            baseline continues for the whole run. Shorter runs contain only
+            Selected fixture: {manifest.fixture}.{" "}
+            {manifest.scenario
+              ? `Injection starts at ${manifest.scenario.stages[0]!.startMs / 1000} s and stops at ${manifest.scenario.stopAtMs / 1000} s.`
+              : manifest.fixture === "baseline"
+                ? "No injected activity."
+                : "Injection runs from 1–8 s."}{" "}
+            Baseline continues for the whole run. Shorter runs contain only
             their elapsed steps.
           </p>
           <p className="my-3 text-sm text-slate-400">

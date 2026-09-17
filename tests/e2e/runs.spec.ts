@@ -322,6 +322,7 @@ test("inspects organization history, held snapshot evidence and both comparison 
   );
   expect(Object.keys(payload).sort()).toEqual([
     "focus",
+    "focusActivity",
     "schemaVersion",
     "simulationTimeMs",
     "windows",
@@ -384,4 +385,97 @@ test("inspects organization history, held snapshot evidence and both comparison 
     ),
   ).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test("launches the full sequence, inspects second-host evidence and retains unavailable decline measurements", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000);
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: "Start run", exact: true }),
+  ).toBeEnabled();
+  await page
+    .getByLabel("Comparison fixture")
+    .selectOption("credential-compromise");
+  await expect(page.getByLabel("Duration (simulation seconds)")).toHaveValue(
+    "95",
+  );
+  await expect(
+    page.getByText("With default settings, this run uses", { exact: false }),
+  ).toContainText("20 requests");
+  await page.getByLabel("Duration (simulation seconds)").fill("40");
+  await page.getByLabel("Evaluate with Jev (uses API credits)").check();
+  await page.getByRole("button", { name: "Start run", exact: true }).click();
+  await expect(page.getByText("Completed", { exact: true })).toBeVisible({
+    timeout: 60_000,
+  });
+  const id = (await page.getByTestId("run-id").textContent())!;
+  const saved = recordingSchema.parse(
+    await (await request.get(`http://localhost:3101/api/runs/${id}`)).json(),
+  );
+  if (saved.run.manifest.schemaVersion !== 2)
+    throw new Error("Expected telemetry run");
+  const secondHost = saved.run.manifest.scenario!.secondHostId;
+  expect(saved.commands.map((command) => command.type)).toEqual([
+    "start",
+    "begin-injection",
+    "stop-injection",
+  ]);
+  await page.getByText("Manifest and command log", { exact: true }).click();
+  await expect(
+    page.locator("pre").filter({ hasText: '"stop-injection"' }),
+  ).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Snapshot", exact: true })
+    .selectOption("snapshot-000031");
+  await page
+    .getByText("Focus activity: authentication, DNS and network", {
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole("table", { name: "Focus activity observations" }),
+  ).toContainText(secondHost);
+  await expect(
+    page.getByRole("table", { name: "Focus activity observations" }),
+  ).toContainText("445");
+  await expect(
+    page.getByText("No successful decision yet. Risk is unknown."),
+  ).toBeVisible();
+  const response = await request.post(
+    "http://localhost:3101/api/evaluation-reports",
+    { data: { runIds: [id] } },
+  );
+  expect(response.status()).toBe(201);
+  await page.getByText(/Model evaluation reports \(/).click();
+  await page.getByRole("button", { name: "Refresh reports" }).click();
+  await page.getByText(/1 runs · scenario-metrics\/1/).click();
+  await page.getByText(/Decisions: credential-compromise/).click();
+  await expect(
+    page.getByText("Compromise probability:", { exact: false }),
+  ).toContainText("Unknown before stop → Unknown at run end");
+  await expect(
+    page.getByText("Post-stop responses:", { exact: false }),
+  ).toContainText("0 / 2");
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page
+    .getByLabel("Comparison fixture")
+    .selectOption("benign-maintenance");
+  await expect(page.getByLabel("Duration (simulation seconds)")).toHaveValue(
+    "95",
+  );
+  await page.getByLabel("Duration (simulation seconds)").fill("6");
+  await page.getByLabel("Evaluate with Jev (uses API credits)").uncheck();
+  await page.getByRole("button", { name: "Start run", exact: true }).click();
+  await expect(page.getByTestId("run-id")).not.toHaveText(id);
+  await expect(page.getByText("Completed", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
 });

@@ -1,5 +1,7 @@
 import {
   evaluatorInputSchema,
+  activityObservationSchema,
+  type FocusActivity,
   observableSnapshotSchema,
   windowSizes,
   type AggregateMetric,
@@ -146,11 +148,70 @@ export function aggregateInput(
         b.attempts - a.attempts ||
         a.userId.localeCompare(b.userId),
     );
+  const focus = candidates[0] ?? null;
+  const groups = new Map<string, FocusActivity["groups"][number]>();
+  let totalEvents = 0;
+  for (const event of events) {
+    if (
+      !focus ||
+      !("userId" in event) ||
+      event.userId !== focus.userId ||
+      event.simulationTimeMs <= simulationTimeMs - 30_000 ||
+      event.simulationTimeMs > simulationTimeMs
+    )
+      continue;
+    const observation = activityObservationSchema.parse(
+      Object.fromEntries(
+        Object.entries(event).filter(
+          ([key]) =>
+            ![
+              "runId",
+              "eventId",
+              "sequence",
+              "simulationTimeMs",
+              "occurredAt",
+              "source",
+              "severity",
+            ].includes(key),
+        ),
+      ),
+    );
+    const key = JSON.stringify(observation);
+    const group = groups.get(key) ?? {
+      observation,
+      count: 0,
+      firstSimulationMs: event.simulationTimeMs,
+      lastSimulationMs: event.simulationTimeMs,
+      evidenceSequences: [],
+    };
+    group.count++;
+    group.firstSimulationMs = Math.min(
+      group.firstSimulationMs,
+      event.simulationTimeMs,
+    );
+    group.lastSimulationMs = Math.max(
+      group.lastSimulationMs,
+      event.simulationTimeMs,
+    );
+    group.evidenceSequences.push(event.sequence);
+    groups.set(key, group);
+    totalEvents++;
+  }
+  const orderedGroups = [...groups.entries()].sort(
+    (a, b) =>
+      b[1].lastSimulationMs - a[1].lastSimulationMs || a[0].localeCompare(b[0]),
+  );
   return evaluatorInputSchema.parse({
-    schemaVersion: "observable-state/1",
+    schemaVersion: "observable-state/2",
     simulationTimeMs,
     windows,
-    focus: candidates[0] ?? null,
+    focus,
+    focusActivity: {
+      windowMs: 30_000,
+      totalEvents,
+      omittedGroups: Math.max(0, groups.size - 16),
+      groups: orderedGroups.slice(0, 16).map(([, group]) => group),
+    },
   });
 }
 

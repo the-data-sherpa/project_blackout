@@ -9,14 +9,30 @@ import {
   organizationSchema,
   telemetryEventSchema,
   observableSnapshotSchema,
+  scenarioPlanSchema,
 } from "./telemetry.js";
 
-export const startRunSchema = z.strictObject({
-  seed: z.string().trim().min(1).max(128),
-  durationSeconds: z.number().int().min(1).max(120).default(30),
-  fixture: fixtureSchema.default("baseline"),
-  evaluate: z.boolean().default(false),
-});
+export const startRunSchema = z
+  .strictObject({
+    seed: z.string().trim().min(1).max(128),
+    durationSeconds: z.number().int().min(1).max(120).default(30),
+    fixture: fixtureSchema.default("baseline"),
+    evaluate: z.boolean().default(false),
+    stopInjectionAtSeconds: z.number().int().min(1).max(35).optional(),
+  })
+  .superRefine((input, context) => {
+    if (
+      input.stopInjectionAtSeconds !== undefined &&
+      ((input.fixture !== "credential-compromise" &&
+        input.fixture !== "benign-maintenance") ||
+        input.stopInjectionAtSeconds > input.durationSeconds)
+    )
+      context.addIssue({
+        code: "custom",
+        message:
+          "A scheduled stop requires a full scenario and must occur within the run",
+      });
+  });
 
 export const runIdSchema = z.uuid();
 const simulationTimeSchema = z.number().int().nonnegative();
@@ -40,17 +56,33 @@ export const legacyManifestSchema = z.strictObject({
   resolvedModel: z.string().nullable(),
 });
 
-export const telemetryManifestSchema = legacyManifestSchema.extend({
-  schemaVersion: z.literal(2),
-  generatorVersion: z.literal("telemetry/1"),
-  scenarioVersion: z.literal("fixtures/1"),
-  aggregatorVersion: z.literal("rolling-state/1"),
-  warmupMs: z.literal(900_000),
-  fixture: fixtureSchema,
-  organization: organizationSchema,
-  evaluation: evaluationConfigSchema.optional(),
-  policy: policyConfigSchema.optional(),
-});
+export const telemetryManifestSchema = legacyManifestSchema
+  .extend({
+    schemaVersion: z.literal(2),
+    generatorVersion: z.literal("telemetry/1"),
+    scenarioVersion: z.enum(["fixtures/1", "scenarios/1"]),
+    aggregatorVersion: z.enum(["rolling-state/1", "rolling-state/2"]),
+    warmupMs: z.literal(900_000),
+    fixture: fixtureSchema,
+    organization: organizationSchema,
+    scenario: scenarioPlanSchema.optional(),
+    evaluation: evaluationConfigSchema.optional(),
+    policy: policyConfigSchema.optional(),
+  })
+  .superRefine((manifest, context) => {
+    const fullScenario =
+      manifest.fixture === "credential-compromise" ||
+      manifest.fixture === "benign-maintenance";
+    if (
+      fullScenario !== (manifest.scenarioVersion === "scenarios/1") ||
+      fullScenario !== Boolean(manifest.scenario)
+    )
+      context.addIssue({
+        code: "custom",
+        message:
+          "Full scenarios require a versioned plan; first-slice fixtures must not carry one",
+      });
+  });
 export const manifestSchema = z.discriminatedUnion("schemaVersion", [
   legacyManifestSchema,
   telemetryManifestSchema,
@@ -100,7 +132,7 @@ export const commandSchema = z.strictObject({
   sequence: z.number().int().positive(),
   simulationTimeMs: simulationTimeSchema,
   recordedAt: z.iso.datetime(),
-  type: z.literal("start"),
+  type: z.enum(["start", "begin-injection", "stop-injection"]),
   parameters: z.strictObject({ fixture: fixtureSchema }).optional(),
 });
 
@@ -145,6 +177,7 @@ export const runMessageSchema = z.discriminatedUnion("type", [
     run: runSchema,
     events: z.array(observableEventSchema),
     snapshot: observableSnapshotSchema.optional(),
+    commands: z.array(commandSchema).optional(),
   }),
   z.strictObject({
     type: z.literal("recording.error"),

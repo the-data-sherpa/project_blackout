@@ -4,6 +4,7 @@ import {
   recordingSchema,
   runListSchema,
   runSchema,
+  commandSchema,
   scenarioTruthSchema,
   inferenceAttemptSchema,
   observableSnapshotSchema,
@@ -128,7 +129,7 @@ export class Recordings {
       : null;
     const expected =
       input &&
-      (attempt.request.state.schemaVersion === "observable-summary/1"
+      (attempt.request.state.schemaVersion.startsWith("observable-summary/")
         ? summarizeInput(input)
         : input);
     if (
@@ -178,9 +179,23 @@ export class Recordings {
     events: ObservableEvent[] = [],
     snapshot?: ObservableSnapshot,
     truth?: ScenarioTruth,
+    commands: RunCommand[] = [],
   ) {
     this.database.transaction(() => {
       this.insertEvidence(run.id, events, snapshot, truth);
+      for (const value of commands) {
+        const command = commandSchema.parse(value);
+        if (
+          command.runId !== run.id ||
+          command.simulationTimeMs !== run.simulationTimeMs
+        )
+          throw new Error("Command must belong to the committed step");
+        this.database
+          .prepare(
+            "INSERT INTO commands (run_id, sequence, record) VALUES (?, ?, ?)",
+          )
+          .run(run.id, command.sequence, JSON.stringify(command));
+      }
       this.database
         .prepare("UPDATE runs SET status = ?, record = ? WHERE id = ?")
         .run(run.status, JSON.stringify(run), run.id);

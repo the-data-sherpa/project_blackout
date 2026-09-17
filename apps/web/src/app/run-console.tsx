@@ -166,6 +166,15 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               return {
                 ...previous,
                 run: next,
+                commands: [
+                  ...previous.commands,
+                  ...(message.commands ?? []).filter(
+                    (command) =>
+                      !previous.commands.some(
+                        (saved) => saved.sequence === command.sequence,
+                      ),
+                  ),
+                ],
                 snapshots:
                   message.snapshot &&
                   !previous.snapshots.some(
@@ -336,15 +345,36 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
             className="mt-2 block min-h-11 w-full rounded border border-slate-500 bg-slate-950 px-3 text-slate-100"
             name="fixture"
             value={fixture}
-            onChange={(event) =>
-              setFixture(fixtureSchema.parse(event.target.value))
-            }
+            onChange={(event) => {
+              const selected = fixtureSchema.parse(event.target.value);
+              setFixture(selected);
+              if (
+                selected === "credential-compromise" ||
+                selected === "benign-maintenance"
+              )
+                setDuration("95");
+            }}
           >
             <option value="baseline">Baseline only</option>
+            <option value="credential-compromise">
+              Full credential compromise
+            </option>
+            <option value="benign-maintenance">
+              Benign maintenance control
+            </option>
             <option value="credential-attack">Minimal credential attack</option>
             <option value="harmless-anomaly">Harmless anomaly</option>
           </select>
         </label>
+        {(fixture === "credential-compromise" ||
+          fixture === "benign-maintenance") && (
+          <p className="mt-3 text-sm text-slate-300">
+            Injection starts at 5 s and stops at 35 s. A 95-second run includes
+            60 seconds of continued baseline traffic after the stop. Shorter
+            runs contain only their elapsed stages. Scenario choice does not set
+            Jev’s judgment.
+          </p>
+        )}
         <label className="mt-4 flex min-h-11 items-center gap-3 text-sm text-slate-200">
           <input
             type="checkbox"
@@ -356,8 +386,10 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
           Evaluate with Jev (uses API credits)
         </label>
         <p className="mt-2 text-sm text-slate-400">
-          With default settings, a 30-second run uses 7 requests, up to 14 with
-          retries. Missing credentials produce recorded unavailable attempts.
+          With default settings, this run uses{" "}
+          {Math.ceil(Number(duration || 0) / 5) + 1} requests, up to{" "}
+          {(Math.ceil(Number(duration || 0) / 5) + 1) * 2} with retries. Missing
+          credentials produce recorded unavailable attempts.
         </p>
         <p className="mt-3 text-sm text-slate-400">
           One active run at a time. Each run ends at its chosen duration.
