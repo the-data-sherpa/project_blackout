@@ -9,11 +9,13 @@ import { InvestigationPanel } from "./investigation-panel";
 export function RunInspection({
   recording,
   connected,
+  readOnly = false,
   backendUrl,
   onSaved,
 }: {
   recording: Recording;
   connected: boolean;
+  readOnly?: boolean;
   backendUrl: string;
   onSaved: (recording: Recording) => void;
 }) {
@@ -40,6 +42,7 @@ export function RunInspection({
       <InvestigationPanel
         recording={recording}
         connected={connected}
+        readOnly={readOnly}
         backendUrl={backendUrl}
         onSaved={onSaved}
         onInspect={select}

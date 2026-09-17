@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "m7-reevaluation-sample/1",
+  "recordedAt": "2026-09-17T18:52:36Z",
+  "seed": "m7-real-reevaluation",
+  "fixture": "credential-attack",
+  "durationSeconds": 5,
+  "model": "jev-1.13.0",
+  "sourceRunId": "11fc46db-116e-4887-a1c5-3d0623962008",
+  "reevaluationRunId": "184d790b-53ff-4310-8983-4ca3fb404335",
+  "sourceUnchanged": true,
+  "checkpoints": [
+    {
+      "simulationTimeMs": 0,
+      "source": {
+        "compromiseProbability": 0.16,
+        "classification": "normal",
+        "policyOutcome": "observe"
+      },
+      "reevaluation": {
+        "compromiseProbability": 0.13,
+        "classification": "normal",
+        "policyOutcome": "observe"
+      }
+    },
+    {
+      "simulationTimeMs": 5000,
+      "source": {
+        "compromiseProbability": 0.79,
+        "classification": "compromise",
+        "policyOutcome": "review"
+      },
+      "reevaluation": {
+        "compromiseProbability": 0.8,
+        "classification": "compromise",
+        "policyOutcome": "incident_advisory"
+      }
+    }
+  ],
+  "notes": [
+    "This is one real-API sample, not a model-quality evaluation.",
+    "Both linked recordings retained their own response and policy outcome.",
+    "The source recording remained byte-for-byte unchanged after reevaluation."
+  ]
+}

@@ -15,12 +15,14 @@ const button =
 export function InvestigationPanel({
   recording,
   connected,
+  readOnly = false,
   backendUrl,
   onSaved,
   onInspect,
 }: {
   recording: Recording;
   connected: boolean;
+  readOnly?: boolean;
   backendUrl: string;
   onSaved: (recording: Recording) => void;
   onInspect: (id: string) => void;
@@ -33,7 +35,8 @@ export function InvestigationPanel({
   const configured =
     recording.run.manifest.schemaVersion === 2 &&
     !!recording.run.manifest.investigation;
-  const available = !busy && (recording.run.status !== "running" || connected);
+  const available =
+    !readOnly && !busy && (recording.run.status !== "running" || connected);
 
   async function act(type: InvestigationAction["type"]) {
     const request =
@@ -122,6 +125,12 @@ export function InvestigationPanel({
           the next matching decision reopens it. Acknowledgement remains until
           closure. Local actions are attributed to “local-operator”; this is not
           an authenticated identity.
+        </p>
+      )}
+      {readOnly && configured && (
+        <p className="text-sm text-slate-400">
+          Playback is read-only. Investigation actions shown here are stored
+          history.
         </p>
       )}
       {(status === "open" || status === "acknowledged") && (

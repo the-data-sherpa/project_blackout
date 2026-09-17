@@ -122,6 +122,14 @@ export function RunBrowser({
                 <span className="mt-2 block break-all font-mono text-xs text-slate-400">
                   {run.id}
                 </span>
+                {run.derivation && (
+                  <span className="mt-1 block text-xs text-violet-200">
+                    {run.derivation.type === "telemetry-rerun"
+                      ? "Telemetry rerun"
+                      : "Jev reevaluation"}{" "}
+                    · linked to {run.derivation.sourceRunId}
+                  </span>
+                )}
                 <time
                   dateTime={run.createdAt}
                   className="mt-1 block text-xs text-slate-400"

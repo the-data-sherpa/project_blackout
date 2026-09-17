@@ -1,7 +1,13 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { recordingSchema, type JevResponse } from "@blackout/contracts";
 import { buildApp } from "../../apps/server/src/app.js";
 import { defaultEvaluation } from "../../apps/server/src/evaluator.js";
+
+async function seekToEnd(page: Page) {
+  const timeline = page.getByLabel("Recording timeline");
+  await expect(timeline).toBeVisible();
+  await timeline.fill((await timeline.getAttribute("max"))!);
+}
 
 test("follows exact timeline evidence, filters observations, and persists operator actions with retry and reload", async ({
   page,
@@ -104,6 +110,7 @@ test("follows exact timeline evidence, filters observations, and persists operat
       });
     });
     await page.goto(`/?run=${started.run.id}`);
+    await seekToEnd(page);
     await expect(page.getByTestId("investigation-status")).toHaveText("Open");
     await expect(page.getByTestId("decision-metrics")).toContainText(
       "3 (0 pending; 1 failed)",
@@ -142,6 +149,7 @@ test("follows exact timeline evidence, filters observations, and persists operat
       page.getByText("classification confidence >= 0.75:", { exact: false }),
     ).toContainText("Unevaluable");
     await page.reload();
+    await seekToEnd(page);
     await expect(page.getByTestId("decision-evidence")).toContainText(
       "snapshot-000006 · 5 s",
     );
@@ -185,6 +193,7 @@ test("follows exact timeline evidence, filters observations, and persists operat
       "Closed by operator",
     );
     await page.reload();
+    await seekToEnd(page);
     await expect(page.getByTestId("investigation-status")).toHaveText(
       "Closed by operator",
     );

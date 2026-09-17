@@ -153,7 +153,7 @@ retry, persisted history and 320/375-pixel layouts. The M6 browser test uses the
 real backend and SQLite with a deterministic Jev transport. It makes no live
 Jev calls and does not constitute a new model-performance evaluation.
 
-Recorded playback, temporal seeking and model reevaluation remain M7 work.
-The M6 timeline selects decision evidence; it does not reconstruct the entire
-console at a past time. The investigation panel always shows the latest recorded
-investigation status and is separate from the selected historical decision.
+M7 adds whole-console recorded playback, temporal seeking, deterministic
+telemetry reruns and linked fresh reevaluation. See
+[M7 — Playback, seeking, reruns and reevaluation](M7-PLAYBACK.md). The M6
+decision timeline remains the evidence selector within live and recorded views.

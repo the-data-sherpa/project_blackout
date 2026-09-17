@@ -7,6 +7,7 @@ import {
   type Fixture,
   apiErrorSchema,
   recordingSchema,
+  runOperationResultSchema,
   runIdSchema,
   startRunSchema,
   type Recording,
@@ -16,6 +17,7 @@ import { RunInspection } from "./run-inspection";
 import { EvaluationReports } from "./evaluation-reports";
 import { useRunStream } from "./use-run-stream";
 import { RunControls } from "./run-controls";
+import { RecordedPlayback } from "./recorded-playback";
 
 const buttonClass =
   "min-h-11 rounded border border-slate-500 px-4 py-2 text-sm hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-60";
@@ -40,6 +42,9 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
   const [stream, setStream] = useState("Not connected");
   const [attempt, setAttempt] = useState(0);
   const [setupAttempt, setSetupAttempt] = useState(0);
+  const [operation, setOperation] = useState<"rerun" | "reevaluation" | null>(
+    null,
+  );
 
   useEffect(() => {
     let disposed = false;
@@ -134,6 +139,46 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function derive(kind: "rerun" | "reevaluation") {
+    if (!recording) return;
+    setOperation(kind);
+    setError(null);
+    try {
+      const response = await fetch(
+        new URL(
+          `/api/runs/${recording.run.id}/${kind === "rerun" ? "reruns" : "reevaluations"}`,
+          backendUrl,
+        ),
+        {
+          method: "POST",
+          signal: AbortSignal.timeout(kind === "rerun" ? 10_000 : 180_000),
+        },
+      );
+      if (!response.ok)
+        throw new Error(apiErrorSchema.parse(await response.json()).message);
+      const result = runOperationResultSchema.parse(await response.json());
+      if (result.status === "incompatible") {
+        setError(result.message);
+        return;
+      }
+      const saved = result.recording;
+      setRecording(saved);
+      setRunId(saved.run.id);
+      const url = new URL(window.location.href);
+      url.searchParams.set("run", saved.run.id);
+      url.searchParams.delete("decision");
+      window.history.replaceState(null, "", url);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not create the linked recording.",
+      );
+    } finally {
+      setOperation(null);
     }
   }
 
@@ -389,29 +434,28 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               <dd className="mt-2 font-mono text-sm">{stream}</dd>
             </div>
           </dl>
-          <RunControls
-            key={`controls-${run.id}`}
-            recording={recording}
-            connected={stream === "Connected"}
-            canReset={
-              stream === "Connected" ||
-              (stream === "Recorded" && activeRunId === null)
-            }
-            backendUrl={backendUrl}
-            onSaved={(saved) => {
-              if (saved.run.id !== run.id) {
-                setRecording(saved);
-                selectRun(saved.run.id);
-                setActiveRunId(saved.run.id);
-              } else
-                setRecording((previous) =>
-                  previous?.run.id === saved.run.id &&
-                  previous.run.revision > saved.run.revision
-                    ? previous
-                    : saved,
-                );
-            }}
-          />
+          {run.status === "running" && (
+            <RunControls
+              key={`controls-${run.id}`}
+              recording={recording}
+              connected={stream === "Connected"}
+              canReset={stream === "Connected"}
+              backendUrl={backendUrl}
+              onSaved={(saved) => {
+                if (saved.run.id !== run.id) {
+                  setRecording(saved);
+                  selectRun(saved.run.id);
+                  setActiveRunId(saved.run.id);
+                } else
+                  setRecording((previous) =>
+                    previous?.run.id === saved.run.id &&
+                    previous.run.revision > saved.run.revision
+                      ? previous
+                      : saved,
+                  );
+              }}
+            />
+          )}
           {run.status !== "running" && (
             <p className="mb-5 text-sm text-slate-300">
               Viewing saved events. Opening this recording does not restart
@@ -458,20 +502,117 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               )}
             </pre>
           </details>
-          <RunInspection
-            key={`inspection-${run.id}`}
-            recording={recording}
-            connected={stream === "Connected"}
-            backendUrl={backendUrl}
-            onSaved={(saved) =>
-              setRecording((previous) =>
-                previous?.run.id === saved.run.id &&
-                previous.run.revision > saved.run.revision
-                  ? previous
-                  : saved,
-              )
-            }
-          />
+          {run.status !== "running" && !run.derivation && (
+            <section
+              className="mb-6 rounded border border-slate-600 p-4"
+              aria-labelledby="recording-actions-title"
+            >
+              <h3 id="recording-actions-title" className="font-medium">
+                Create a linked run
+              </h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Reproduce telemetry from the saved manifest and command
+                schedule, or send the stored observable checkpoints through Jev
+                again. Neither action changes this recording.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  className={buttonClass}
+                  disabled={operation !== null}
+                  onClick={() => {
+                    void derive("rerun");
+                  }}
+                >
+                  {operation === "rerun"
+                    ? "Reproducing telemetry…"
+                    : "Reproduce telemetry"}
+                </button>
+                <button
+                  type="button"
+                  className={buttonClass}
+                  disabled={operation !== null}
+                  onClick={() => {
+                    void derive("reevaluation");
+                  }}
+                >
+                  {operation === "reevaluation"
+                    ? "Reevaluating with Jev…"
+                    : "Reevaluate with Jev"}
+                </button>
+              </div>
+              <p className="mt-3 text-xs text-slate-400">
+                Telemetry reproduction makes no Jev requests and does not claim
+                model responses are reproducible. Reevaluation uses API credits;
+                unavailable access is recorded as a bounded failed attempt.
+              </p>
+            </section>
+          )}
+          {run.derivation && (
+            <section
+              className="mb-6 rounded border border-slate-600 p-4"
+              aria-labelledby="linked-run-title"
+            >
+              <h3 id="linked-run-title" className="font-medium">
+                {run.derivation.type === "telemetry-rerun"
+                  ? "Deterministic telemetry rerun"
+                  : "Fresh Jev reevaluation"}
+              </h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Source recording:{" "}
+                <span className="break-all font-mono text-xs">
+                  {run.derivation.sourceRunId}
+                </span>
+              </p>
+              {run.derivation.type === "telemetry-rerun" && (
+                <p
+                  className="mt-2 text-sm text-slate-300"
+                  data-testid="rerun-comparison"
+                >
+                  {run.derivation.eventsMatch
+                    ? `Full telemetry match: ${run.derivation.reproducedEventCount.toLocaleString("en-US")} events.`
+                    : `Telemetry differs at sequence ${run.derivation.firstMismatchSequence ?? "after the retained source"}.`}
+                </p>
+              )}
+              <button
+                type="button"
+                className={`${buttonClass} mt-4`}
+                onClick={() => selectRun(run.derivation!.sourceRunId)}
+              >
+                View source recording
+              </button>
+            </section>
+          )}
+          {run.status === "running" ? (
+            <RunInspection
+              key={`inspection-${run.id}`}
+              recording={recording}
+              connected={stream === "Connected"}
+              backendUrl={backendUrl}
+              onSaved={(saved) =>
+                setRecording((previous) =>
+                  previous?.run.id === saved.run.id &&
+                  previous.run.revision > saved.run.revision
+                    ? previous
+                    : saved,
+                )
+              }
+            />
+          ) : (
+            <RecordedPlayback
+              key={`playback-${run.id}`}
+              recording={recording}
+              backendUrl={backendUrl}
+              onSaved={(saved) =>
+                setRecording((previous) =>
+                  previous?.run.id === saved.run.id &&
+                  previous.run.revision > saved.run.revision
+                    ? previous
+                    : saved,
+                )
+              }
+            />
+          )}
         </section>
       )}
     </section>

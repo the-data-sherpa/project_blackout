@@ -100,25 +100,28 @@ export class Recordings {
       .prepare("SELECT record FROM runs WHERE id = ?")
       .get(id);
     if (!row) return null;
+    const run = runSchema.parse(readJson(row));
+    const evidenceRunId =
+      run.derivation?.type === "reevaluation" ? run.derivation.sourceRunId : id;
     return recordingSchema.parse({
-      run: readJson(row),
+      run,
       attempts: this.attempts(id),
       investigationHistory: this.investigationHistory(id),
       events: this.database
         .prepare("SELECT record FROM events WHERE run_id = ? ORDER BY sequence")
-        .all(id)
+        .all(evidenceRunId)
         .map(readJson),
       snapshots: this.database
         .prepare(
           "SELECT record FROM snapshots WHERE run_id = ? ORDER BY simulation_time_ms",
         )
-        .all(id)
+        .all(evidenceRunId)
         .map(readJson),
       commands: this.database
         .prepare(
           "SELECT record FROM commands WHERE run_id = ? ORDER BY sequence",
         )
-        .all(id)
+        .all(evidenceRunId)
         .map(readJson),
     });
   }
@@ -247,6 +250,58 @@ export class Recordings {
           });
       }
       if (run) this.commit(run);
+    })();
+  }
+
+  createDerived(
+    value: Recording,
+    storedSnapshots: ObservableSnapshot[] = value.snapshots,
+  ) {
+    const recording = recordingSchema.parse(value);
+    if (recording.run.status === "running")
+      throw new Error("Derived recordings must be complete");
+    this.database.transaction(() => {
+      this.database
+        .prepare("INSERT INTO runs (id, status, record) VALUES (?, ?, ?)")
+        .run(
+          recording.run.id,
+          recording.run.status,
+          JSON.stringify(recording.run),
+        );
+      const insertEvent = this.database.prepare(
+        "INSERT INTO events (run_id, sequence, record) VALUES (?, ?, ?)",
+      );
+      for (const event of recording.events)
+        insertEvent.run(
+          recording.run.id,
+          event.sequence,
+          JSON.stringify(event),
+        );
+      const insertCommand = this.database.prepare(
+        "INSERT INTO commands (run_id, sequence, record) VALUES (?, ?, ?)",
+      );
+      for (const command of recording.commands)
+        insertCommand.run(
+          recording.run.id,
+          command.sequence,
+          JSON.stringify(command),
+        );
+      const insertSnapshot = this.database.prepare(
+        "INSERT INTO snapshots (run_id, id, simulation_time_ms, record) VALUES (?, ?, ?, ?)",
+      );
+      for (const value of storedSnapshots) {
+        const snapshot = observableSnapshotSchema.parse(value);
+        insertSnapshot.run(
+          recording.run.id,
+          snapshot.id,
+          snapshot.simulationTimeMs,
+          JSON.stringify(snapshot),
+        );
+      }
+      for (const attempt of recording.attempts)
+        this.saveAttempt(attempt, recording.run);
+      for (const event of recording.investigationHistory)
+        this.saveInvestigation(event);
     })();
   }
 

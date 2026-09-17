@@ -79,6 +79,25 @@ export const startRunSchema = z
   });
 
 export const runIdSchema = z.uuid();
+export const runDerivationSchema = z.discriminatedUnion("type", [
+  z.strictObject({
+    type: z.literal("telemetry-rerun"),
+    sourceRunId: runIdSchema,
+    compatibility: z.literal("compatible"),
+    eventsMatch: z.boolean(),
+    sourceEventCount: z.number().int().nonnegative(),
+    reproducedEventCount: z.number().int().nonnegative(),
+    firstMismatchSequence: z.number().int().positive().nullable(),
+  }),
+  z.strictObject({
+    type: z.literal("reevaluation"),
+    sourceRunId: runIdSchema,
+    checkpointMs: z.number().int().positive(),
+    questionVersion: z.string().min(1),
+    requestedModel: z.string().min(1),
+    policyVersion: z.string().min(1),
+  }),
+]);
 const simulationTimeSchema = z.number().int().nonnegative();
 
 export const legacyManifestSchema = z.strictObject({
@@ -163,6 +182,7 @@ export const runSchema = z.strictObject({
     .optional(),
   endedReason: z.enum(["reset", "shutdown", "storage-failure"]).optional(),
   replacementRunId: runIdSchema.optional(),
+  derivation: runDerivationSchema.optional(),
 });
 
 export const runListQuerySchema = z.strictObject({
@@ -231,6 +251,17 @@ export const recordingSchema = z.strictObject({
   attempts: z.array(inferenceAttemptSchema).default([]),
   investigationHistory: z.array(investigationEventSchema).default([]),
 });
+export const runOperationResultSchema = z.discriminatedUnion("status", [
+  z.strictObject({
+    status: z.literal("created"),
+    recording: recordingSchema,
+  }),
+  z.strictObject({
+    status: z.literal("incompatible"),
+    sourceRunId: runIdSchema,
+    message: z.string().min(1),
+  }),
+]);
 
 export const activeRunSchema = z.strictObject({
   runId: runIdSchema.nullable(),
@@ -284,6 +315,8 @@ export type AuthenticationEvent = z.infer<typeof authenticationEventSchema>;
 export type RunCommand = z.infer<typeof commandSchema>;
 export type Recording = z.infer<typeof recordingSchema>;
 export type RunMessage = z.infer<typeof runMessageSchema>;
+export type RunDerivation = z.infer<typeof runDerivationSchema>;
+export type RunOperationResult = z.infer<typeof runOperationResultSchema>;
 
 export type LegacyManifest = z.infer<typeof legacyManifestSchema>;
 export type TelemetryManifest = z.infer<typeof telemetryManifestSchema>;

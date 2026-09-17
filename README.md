@@ -242,11 +242,11 @@ npm run test:e2e    # Browser tests against the production build
 ```
 
 Vitest checks transport contracts, configuration, deterministic generation,
-transaction rollback, run isolation, and database persistence through process
-termination and restart. Playwright checks stored-run browsing,
-start-to-inspect, recording reload, real connections, failure recovery, keyboard
-access, and a narrow viewport. Browser tests use ports 3100/3101 and an in-memory
-database.
+transaction rollback, run isolation, database persistence, playback projection,
+telemetry reruns and reevaluation immutability. Playwright checks stored-run
+browsing, start-to-inspect, recording reload, playback seeking, linked runs,
+real connections, failure recovery, keyboard access and a narrow viewport.
+Browser tests use ports 3100/3101 and an in-memory database.
 
 GitHub Actions runs these checks and verifies Docker Compose startup. To run the
 production build locally after `npm run build`, stop development or Compose and
@@ -261,6 +261,9 @@ storage behavior.
 - [Full MVP roadmap: milestones M1–M9 and acceptance criteria](docs/MVP-ROADMAP.md)
 - [Published GitHub tickets and blocking dependencies](docs/MVP-TICKETS.md)
 
-The next milestone, M7, adds recorded playback, temporal seeking, deterministic
-telemetry reruns and fresh model reevaluation.
-The full MVP requires milestones M1–M9.
+M7 recorded playback, temporal seeking, deterministic telemetry reruns and fresh
+model reevaluation are implemented. The [M7 guide](docs/M7-PLAYBACK.md) records
+the interfaces, measured seek behavior and real Jev sample.
+
+The next milestone, M8, adds evidence-based topology and the finished console
+experience. The full MVP requires milestones M1–M9.

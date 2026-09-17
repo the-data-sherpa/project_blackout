@@ -11,6 +11,7 @@ import {
   recordingSchema,
   runIdSchema,
   runListQuerySchema,
+  runOperationResultSchema,
   serverMessageSchema,
   startRunSchema,
   type RunMessage,
@@ -110,6 +111,40 @@ export async function buildApp(options: AppOptions) {
         request.params,
       );
       return service.control(id, parseInput(controlRunSchema, request.body));
+    });
+
+    app.post("/api/runs/:id/reruns", async (request, reply) => {
+      const { id } = parseInput(
+        z.strictObject({ id: runIdSchema }),
+        request.params,
+      );
+      if (!service.recordings.get(id))
+        return reply.code(404).send(
+          apiErrorSchema.parse({
+            code: "not_found",
+            message: "This recording was not found.",
+          }),
+        );
+      const result = runOperationResultSchema.parse(service.rerun(id));
+      return reply.code(result.status === "created" ? 201 : 200).send(result);
+    });
+
+    app.post("/api/runs/:id/reevaluations", async (request, reply) => {
+      const { id } = parseInput(
+        z.strictObject({ id: runIdSchema }),
+        request.params,
+      );
+      if (!service.recordings.get(id))
+        return reply.code(404).send(
+          apiErrorSchema.parse({
+            code: "not_found",
+            message: "This recording was not found.",
+          }),
+        );
+      const result = runOperationResultSchema.parse(
+        await service.reevaluate(id),
+      );
+      return reply.code(result.status === "created" ? 201 : 200).send(result);
     });
 
     app.get("/api/evaluator", async () => ({

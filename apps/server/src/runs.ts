@@ -4,6 +4,8 @@ import {
   investigationActionSchema,
   investigationStatus,
   runMessageSchema,
+  recordingSchema,
+  runOperationResultSchema,
   startRunSchema,
   type InferenceAttempt,
   type Run,
@@ -30,6 +32,7 @@ import {
   type EvaluatorOptions,
 } from "./evaluator.js";
 import { evaluatePolicy } from "./policy.js";
+import { recreateTelemetry } from "./replay.js";
 
 export class RunError extends Error {
   constructor(
@@ -175,6 +178,135 @@ export class Runs {
     );
     this.activate(prepared);
     return this.recordings.get(prepared.run.id)!;
+  }
+
+  rerun(runId: string) {
+    const source = this.recordings.get(runId);
+    if (!source)
+      throw new RunError("invalid_transition", "This recording was not found.");
+    const result = recreateTelemetry(source);
+    if (result.status === "incompatible")
+      return runOperationResultSchema.parse(result);
+    this.recordings.createDerived(result.recording);
+    return runOperationResultSchema.parse({
+      status: "created",
+      recording: this.recordings.get(result.recording.run.id)!,
+    });
+  }
+
+  async reevaluate(runId: string) {
+    const source = this.recordings.get(runId);
+    if (!source)
+      throw new RunError("invalid_transition", "This recording was not found.");
+    if (source.run.manifest.schemaVersion !== 2)
+      return runOperationResultSchema.parse({
+        status: "incompatible",
+        sourceRunId: runId,
+        message:
+          "This recording has no compatible observable snapshots for fresh evaluation.",
+      });
+    const sourceSnapshotIds = new Set(
+      source.attempts.map((attempt) => attempt.snapshotId),
+    );
+    const checkpoints = source.snapshots.filter(
+      (snapshot) =>
+        snapshot.simulationTimeMs >= 0 &&
+        (sourceSnapshotIds.size
+          ? sourceSnapshotIds.has(snapshot.id)
+          : snapshot.simulationTimeMs % this.evaluator.config.checkpointMs ===
+              0 || snapshot.simulationTimeMs === source.run.simulationTimeMs),
+    );
+    if (!checkpoints.length)
+      return runOperationResultSchema.parse({
+        status: "incompatible",
+        sourceRunId: runId,
+        message:
+          "This recording has no compatible observable snapshots for fresh evaluation.",
+      });
+
+    const id = randomUUID();
+    const attempts = new Map<string, InferenceAttempt>();
+    const storedSnapshots = checkpoints.map((snapshot) => ({
+      ...snapshot,
+      runId: id,
+    }));
+    for (const snapshot of storedSnapshots)
+      await this.evaluator.checkpoint(
+        snapshot,
+        (attempt) => {
+          attempts.set(
+            attempt.id,
+            attempt.status === "pending"
+              ? attempt
+              : {
+                  ...attempt,
+                  appliedAt: attempt.completedAt,
+                  appliedSimulationTimeMs: attempt.simulationTimeMs,
+                },
+          );
+        },
+        new AbortController().signal,
+      );
+    const orderedAttempts = [...attempts.values()].sort(
+      (a, b) =>
+        a.simulationTimeMs - b.simulationTimeMs ||
+        a.attemptNumber - b.attemptNumber,
+    );
+    const resolvedModel = [...orderedAttempts]
+      .reverse()
+      .find((attempt) => attempt.response)?.response?.model;
+    const now = new Date().toISOString();
+    const manifest = {
+      ...source.run.manifest,
+      evaluation: this.evaluator.config,
+      policy: this.evaluator.policy,
+      investigation: undefined,
+      policyVersion: this.evaluator.policy.version,
+      evaluatorVersion: questionVersion,
+      requestedModel: this.evaluator.model,
+      resolvedModel: resolvedModel ?? null,
+    };
+    const recording = recordingSchema.parse({
+      run: {
+        id,
+        manifest,
+        status: "completed",
+        simulationTimeMs: source.run.simulationTimeMs,
+        lastSequence: source.run.lastSequence,
+        createdAt: now,
+        endedAt: now,
+        revision: 0,
+        controls: source.run.controls
+          ? {
+              ...source.run.controls,
+              paused: false,
+              pausedAttemptId: null,
+              waitingForInference: false,
+              pendingApplication: false,
+            }
+          : undefined,
+        derivation: {
+          type: "reevaluation",
+          sourceRunId: runId,
+          checkpointMs:
+            source.run.manifest.evaluation?.checkpointMs ??
+            this.evaluator.config.checkpointMs,
+          questionVersion,
+          requestedModel: this.evaluator.model,
+          policyVersion: this.evaluator.policy.version,
+        },
+      },
+      events: [],
+      commands: [],
+      snapshots: storedSnapshots,
+      attempts: orderedAttempts,
+      investigationHistory: [],
+    });
+    this.recordings.createDerived(recording, storedSnapshots);
+    return runOperationResultSchema.parse({
+      status: "created",
+      recording: this.recordings.get(id)!,
+    });
   }
 
   control(runId: string, input: unknown) {
