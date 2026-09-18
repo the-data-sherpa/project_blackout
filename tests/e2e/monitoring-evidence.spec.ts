@@ -274,7 +274,12 @@ test("shows validated distributions together through pending, retry, held, failu
     });
     expect((await read()).attempts).toEqual(saved.attempts);
     await page.reload();
-    await page.getByLabel("Recording timeline").fill("10000");
+    await expect(page.getByTestId("judgment-age")).toContainText(
+      "age 5.0 simulation s at inspected cursor 10 s",
+    );
+    await page
+      .getByRole("button", { name: "Return to playback", exact: true })
+      .click();
     await expect(page.getByTestId("judgment-age")).toContainText(
       "age 5.0 simulation s at playback cursor 10 s",
     );
