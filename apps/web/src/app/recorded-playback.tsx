@@ -145,21 +145,21 @@ export function RecordedPlayback({
     <div className="min-w-0">
       {!live && (
         <section
-          className="mb-6 rounded-lg border border-emerald-400/50 bg-emerald-950/10 p-4 sm:p-5"
+          className="playback-toolbar mb-3 rounded border border-slate-700 bg-slate-950/40 p-3"
           aria-labelledby="playback-title"
         >
           <p className="font-mono text-xs uppercase tracking-widest text-emerald-300">
             Recorded playback · offline · simulation read-only
           </p>
-          <h3 id="playback-title" className="mt-2 text-lg font-medium">
+          <h3 id="playback-title" className="sr-only">
             Playback controls
           </h3>
-          <p className="mt-2 text-sm text-slate-300">
+          <p className="sr-only">
             Stored telemetry, decisions, policy results and investigation
             actions only. Playback sends zero Jev requests and accepts no live
             commands.
           </p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="playback-actions flex flex-wrap items-center gap-2">
             <button
               type="button"
               className={control}
@@ -205,10 +205,10 @@ export function RecordedPlayback({
               </select>
             </label>
           </div>
-          <label className="mt-4 block text-sm text-slate-300">
+          <label className="playback-position block min-w-0 text-xs text-slate-300">
             Timeline · {(cursorMs / 1000).toFixed(1)} / {index.endMs / 1000} s
             <input
-              className="mt-2 block min-h-11 w-full accent-emerald-300"
+              className="block min-h-11 w-full accent-emerald-300"
               aria-label="Recording timeline"
               type="range"
               min={0}
@@ -221,7 +221,10 @@ export function RecordedPlayback({
               }}
             />
           </label>
-          <p role="status" className="mt-2 font-mono text-sm text-emerald-200">
+          <p
+            role="status"
+            className="playback-status font-mono text-xs text-emerald-200"
+          >
             {playing ? "Playing" : "Paused"} at {(cursorMs / 1000).toFixed(1)} s
           </p>
         </section>

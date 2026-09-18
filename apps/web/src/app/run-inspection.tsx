@@ -15,6 +15,7 @@ import {
   type Inspection,
   PlaybackIndex,
 } from "./playback";
+import { JudgmentOverview, ProcessingOverview } from "./workspace-overview";
 
 export function RunInspection({
   recording,
@@ -81,7 +82,7 @@ export function RunInspection({
   return (
     <>
       <section
-        className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded border border-cyan-500/50 bg-cyan-950/20 p-4"
+        className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-cyan-500/50 bg-cyan-950/20 px-3 py-2"
         aria-label="Inspection position"
       >
         <div>
@@ -120,18 +121,34 @@ export function RunInspection({
           </button>
         )}
       </section>
-      <EnvironmentTopology
+      <div className="monitor-grid">
+        <div
+          className="monitor-environment"
+          data-testid="environment-zone"
+          role="region"
+          aria-label="Environment and evidence"
+          tabIndex={0}
+        >
+          <EnvironmentTopology
+            recording={projected}
+            activityAnimation={
+              !inspection &&
+              (activityAnimation ?? recording.run.status === "running")
+            }
+            selection={topologySelection}
+            selectedEventSequence={eventSequence}
+            onSelection={setTopologySelection}
+            onEntitySelect={setSelectedEntityId}
+            onEventSelect={setSelectedEventSequence}
+            onDecisionSelect={select}
+          />
+        </div>
+        <JudgmentOverview recording={projected} onInspect={select} />
+      </div>
+      <ProcessingOverview
         recording={projected}
-        activityAnimation={
-          !inspection &&
-          (activityAnimation ?? recording.run.status === "running")
-        }
-        selection={topologySelection}
-        selectedEventSequence={eventSequence}
-        onSelection={setTopologySelection}
-        onEntitySelect={setSelectedEntityId}
-        onEventSelect={setSelectedEventSequence}
-        onDecisionSelect={select}
+        assessment={inspection?.assessment ?? null}
+        onInspect={select}
       />
       <DecisionInspector
         recording={projected}

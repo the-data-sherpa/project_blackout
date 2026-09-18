@@ -7,7 +7,7 @@ test("connects to the real backend and WebSocket without browser errors", async 
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Start a recorded run." }),
+    page.getByRole("heading", { name: "Monitoring workspace" }),
   ).toBeVisible();
   await expect(page.getByText("Ready", { exact: true })).toHaveCount(2);
   await page.getByRole("button", { name: "Check again" }).click();
@@ -44,7 +44,7 @@ test("fits a narrow viewport and supports keyboard retry", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("Ready", { exact: true })).toHaveCount(2);
   await page.keyboard.press("Tab");
-  await expect(page.getByLabel("Seed", { exact: true })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Check again" })).toBeFocused();
   await page.getByRole("button", { name: "Check again" }).focus();
   await expect(page.getByRole("button", { name: "Check again" })).toBeFocused();
   await page.keyboard.press("Enter");

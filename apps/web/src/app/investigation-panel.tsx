@@ -86,7 +86,11 @@ export function InvestigationPanel({
       className="mb-8 min-w-0 space-y-4 rounded-lg border border-amber-300/40 bg-amber-950/10 p-4 sm:p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="investigation-title" className="text-xl font-medium">
+        <h2
+          id="investigation-title"
+          tabIndex={-1}
+          className="text-xl font-medium"
+        >
           Investigation
         </h2>
         <p

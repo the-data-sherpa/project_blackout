@@ -419,7 +419,7 @@ export function TelemetryInspector({
           aria-labelledby="state-title"
           className="min-w-0 rounded border border-slate-700 p-4"
         >
-          <h3 id="state-title" className="font-medium">
+          <h3 id="state-title" tabIndex={-1} className="font-medium">
             Observable state
           </h3>
           <p className="mt-2 text-sm text-slate-400">

@@ -88,7 +88,7 @@ export function DecisionInspector({
       className="mb-8 min-w-0 space-y-4 rounded-lg border border-violet-400/40 bg-violet-950/10 p-4 sm:p-5"
       aria-labelledby="decision-title"
     >
-      <h2 id="decision-title" className="text-xl font-medium">
+      <h2 id="decision-title" tabIndex={-1} className="text-xl font-medium">
         Jev decisions
       </h2>
       <p role="status" className="text-sm text-violet-200">

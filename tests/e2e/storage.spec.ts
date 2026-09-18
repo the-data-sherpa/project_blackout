@@ -39,6 +39,9 @@ test("confirms selected cleanup, recovers a failed delete, and keeps another rec
       });
     });
     await page.goto(`/?run=${ids[1]}`);
+    await page
+      .getByRole("button", { name: "Recordings & storage", exact: true })
+      .click();
     await expect(page.getByTestId("storage-usage")).toContainText("MiB");
     const remove = page.getByRole("button", {
       name: `Delete recording ${ids[1]}`,

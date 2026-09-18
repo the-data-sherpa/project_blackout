@@ -62,3 +62,158 @@ summary:focus-visible,
   background: #28614f;
   color: white;
 }
+
+.monitor-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #2a404e;
+  border-radius: 5px;
+  background: #0d1922;
+}
+.monitor-panel-heading {
+  padding: 12px 16px;
+  border-bottom: 1px solid #2a404e;
+  font-size: 14px;
+}
+.monitor-panel-heading p {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9cafbd;
+}
+.monitor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.monitor-environment {
+  min-width: 0;
+  height: 400px;
+  overflow: auto;
+  border: 1px solid #2a404e;
+  border-radius: 5px;
+  background: #0d1922;
+}
+.monitor-environment .topology-panel {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.monitor-environment [aria-label="Topology nodes"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.judgment-preview {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 0;
+  text-align: left;
+  border-bottom: 1px solid #2a404e;
+}
+.judgment-preview:hover,
+.processing-step:hover {
+  color: #a5f3fc;
+  background: #122530;
+}
+.processing-overview {
+  margin-bottom: 24px;
+}
+.processing-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+.processing-step {
+  min-width: 0;
+  padding: 8px 12px;
+  border-left: 2px solid #405f64;
+  text-align: left;
+}
+.monitor-health dt {
+  font-size: 11px;
+}
+.monitor-health dd {
+  margin-top: 4px;
+  font-size: 12px;
+}
+@media (max-width: 767px) {
+  .monitor-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .monitor-environment {
+    height: auto;
+    max-height: 480px;
+  }
+  .monitor-environment [aria-label="Topology nodes"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .processing-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.processing-toggle {
+  display: none;
+}
+@media (max-width: 767px) {
+  .processing-toggle {
+    display: block;
+  }
+  .processing-steps[data-expanded="false"] {
+    display: none;
+  }
+}
+.playback-toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 1fr);
+  align-items: center;
+  column-gap: 20px;
+  row-gap: 6px;
+}
+.playback-toolbar > p:first-child {
+  grid-column: 1 / -1;
+}
+.playback-position {
+  grid-column: 2;
+  grid-row: 2 / 4;
+}
+@media (max-width: 767px) {
+  .playback-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .playback-position {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+@media (min-width: 768px) {
+  .monitor-health > div {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .monitor-health dd {
+    margin: 0;
+  }
+  .connection-strip {
+    border-bottom: 0;
+    padding: 0;
+  }
+}
+.monitor-environment .topology-assessment {
+  font-size: 12px;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.monitor-environment .topology-assessment span,
+.monitor-environment .topology-assessment button {
+  margin-top: 0;
+}
