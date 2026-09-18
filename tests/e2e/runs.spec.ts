@@ -712,6 +712,10 @@ test("plays, seeks, reproduces and reevaluates a saved recording", async ({
   await expect(page.getByText("Completed", { exact: true })).toBeVisible();
   const sourceId = await page.getByTestId("run-id").textContent();
   await page.reload();
+  await expect(page.getByTestId("inspection-position")).toHaveText(
+    "Inspecting checkpoint · 2.0 s",
+  );
+  await page.goto(`/?run=${sourceId}`);
 
   await expect(
     page.getByText("Recorded playback · offline · simulation read-only", {
