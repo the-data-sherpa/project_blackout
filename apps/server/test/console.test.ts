@@ -24,6 +24,13 @@ import {
   visibleAttempts,
 } from "../../web/src/app/decision-view.js";
 import { receiveRunMessage } from "../../web/src/app/run-stream.js";
+import { judgmentView } from "../../web/src/app/judgment-view.js";
+import {
+  emptyEventFilters,
+  hostSamples,
+  indexEvents,
+  searchEvents,
+} from "../../web/src/app/event-search.js";
 import {
   inspectAssessment,
   newerAssessmentCount,
@@ -92,6 +99,160 @@ async function advance(runs: Runs, count: number) {
     await runs.settled();
   }
 }
+
+it("preserves legacy applied assessments and excludes results applied after the inspected cursor", async () => {
+  const { runs, recordings } = store();
+  const id = runs.start({
+    seed: "legacy-judgments",
+    durationSeconds: 5,
+    evaluate: true,
+  }).run.id;
+  await runs.settled();
+  await advance(runs, 5);
+  const saved = recordings.get(id)!;
+  const legacy = recordingSchema.parse({
+    ...saved,
+    attempts: saved.attempts.map((attempt) => {
+      const value = { ...attempt };
+      delete value.appliedAt;
+      delete value.appliedSimulationTimeMs;
+      return value;
+    }),
+  });
+  expect(judgmentView(legacy).current?.id).toBe(saved.attempts[1]!.id);
+  expect(judgmentView(legacy).previous?.id).toBe(saved.attempts[0]!.id);
+  const future = { ...saved, run: { ...saved.run, simulationTimeMs: 0 } };
+  expect(judgmentView(future).current?.id).toBe(saved.attempts[0]!.id);
+  expect(judgmentView(future).state).toContain(
+    "after this inspected checkpoint",
+  );
+  const held = {
+    ...saved.attempts[1]!,
+    appliedAt: null,
+    appliedSimulationTimeMs: null,
+  };
+  expect(
+    judgmentView({ ...saved, attempts: [saved.attempts[0]!, held] }),
+  ).toMatchObject({
+    current: { id: saved.attempts[0]!.id },
+    state: "Received response · held, not applied",
+    ageMs: 5000,
+  });
+});
+
+it("keeps full event search within inclusive cursor boundaries and keeps missing and old host samples explicit", async () => {
+  const { runs, recordings } = store();
+  const id = runs.start({ seed: "search-boundaries", durationSeconds: 120 }).run
+    .id;
+  await advance(runs, 120);
+  const saved = recordings.get(id)!;
+  const index = indexEvents(saved);
+  expect(index.length).toBeGreaterThan(5000);
+  const last = saved.events.at(-1)!;
+  if (!("eventId" in last)) throw new Error("Expected a versioned event");
+  expect(
+    searchEvents(
+      index,
+      120_000,
+      { ...emptyEventFilters, query: last.eventId.toUpperCase() },
+      null,
+    ).events,
+  ).toEqual([last]);
+  expect(
+    searchEvents(
+      index,
+      119_999,
+      { ...emptyEventFilters, query: last.eventId },
+      null,
+    ).events,
+  ).toEqual([]);
+  expect(
+    searchEvents(
+      index,
+      120_000,
+      { ...emptyEventFilters, from: "120", through: "120" },
+      null,
+    ).events,
+  ).toEqual(saved.events.filter((event) => event.simulationTimeMs === 120_000));
+  expect(
+    searchEvents(
+      index,
+      120_000,
+      { ...emptyEventFilters, from: "121", through: "120" },
+      null,
+    ),
+  ).toMatchObject({
+    events: [],
+    error: "From time must be at or before through time.",
+  });
+  expect(
+    searchEvents(
+      index,
+      120_000,
+      { ...emptyEventFilters, from: "Infinity" },
+      null,
+    ).events,
+  ).toEqual([]);
+  const dns = saved.events.find((event) => event.type === "dns")!;
+  if (dns.type !== "dns" || saved.run.manifest.schemaVersion !== 2)
+    throw new Error("Expected organization and DNS");
+  const service = saved.run.manifest.organization.resources.find(
+    (resource) => resource.domain === dns.query,
+  )!;
+  expect(
+    searchEvents(
+      index,
+      0,
+      {
+        ...emptyEventFilters,
+        kind: "dns",
+        query: dns.query.toUpperCase(),
+        period: "warmup",
+      },
+      service.id,
+    ).events,
+  ).toContain(dns);
+  const metric = saved.events
+    .filter((event) => event.type === "host-metric")
+    .at(-1)!;
+  const at = metric.simulationTimeMs;
+  const noFutureSamples = {
+    ...saved,
+    events: saved.events.filter((event) => event.simulationTimeMs <= at),
+  };
+  expect(hostSamples(noFutureSamples, metric.hostId).ageMs).toBe(
+    saved.run.simulationTimeMs - at,
+  );
+  expect(
+    hostSamples(
+      {
+        ...noFutureSamples,
+        run: { ...saved.run, simulationTimeMs: at + 30_000 },
+      },
+      metric.hostId,
+    ).stale,
+  ).toBe(false);
+  expect(
+    hostSamples(
+      {
+        ...noFutureSamples,
+        run: { ...saved.run, simulationTimeMs: at + 30_001 },
+      },
+      metric.hostId,
+    ).stale,
+  ).toBe(true);
+  expect(
+    hostSamples(
+      {
+        ...saved,
+        events: saved.events.filter((event) => event.type !== "host-metric"),
+      },
+      metric.hostId,
+    ),
+  ).toEqual({ samples: [], ageMs: null, stale: false });
+  const before = { ...saved, run: { ...saved.run, simulationTimeMs: at - 1 } };
+  expect(hostSamples(before, metric.hostId).samples).not.toContain(metric);
+});
 
 it("opens only when every configured threshold matches, preserving fluctuations and missing confidence", async () => {
   const values = [

@@ -5,9 +5,13 @@ import { z } from "zod";
 import {
   scenarioTruthSchema,
   type AggregateMetric,
-  type ObservableEvent,
   type Recording,
 } from "@blackout/contracts";
+
+import { EventTable } from "./event-table";
+import { EventExplorer } from "./event-explorer";
+import { emptyEventFilters, type EventFilters } from "./event-search";
+import { openInspectionDetail } from "./workspace-overview";
 
 const control =
   "min-h-11 max-w-full rounded border border-slate-500 bg-slate-950 px-3 py-2 text-sm text-slate-100";
@@ -26,167 +30,6 @@ const metricLabels: Record<AggregateMetric["name"], string> = {
   meanMemoryPercent: "Mean memory (%)",
 };
 const seconds = (time: number) => `${time / 1000} s`;
-
-function describe(event: ObservableEvent) {
-  switch (event.type) {
-    case "authentication":
-      return `${event.outcome} · ${event.resource} · ${event.sourceIp}${"location" in event ? ` · ${event.location}` : ""}`;
-    case "host-metric":
-      return `CPU ${event.cpuPercent}% · memory ${event.memoryPercent}%`;
-    case "dns":
-      return `${event.query} · ${event.outcome} · ${event.answerIp ?? "no answer"}`;
-    case "network":
-      return `${event.destinationHostId}:${event.destinationPort} · ${event.bytesSent.toLocaleString("en-US")} bytes · ${event.outcome}`;
-  }
-}
-
-function EventTable({
-  events,
-  label,
-  testId = "event-row",
-  selectedSequence = null,
-  onSelect,
-}: {
-  events: ObservableEvent[];
-  label: string;
-  testId?: string;
-  selectedSequence?: number | null;
-  onSelect?: (sequence: number) => void;
-}) {
-  const [page, setPage] = useState(() => {
-    if (selectedSequence === null) return 0;
-    const index = events.findIndex(
-      (event) => event.sequence === selectedSequence,
-    );
-    return index < 0 ? 0 : Math.floor(index / 50);
-  });
-  const offset = Math.min(
-    page * 50,
-    Math.max(0, Math.ceil(events.length / 50) - 1) * 50,
-  );
-  const visible = events.slice(offset, offset + 50);
-  return (
-    <div className="min-w-0 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-300">
-        <p role="status">
-          {events.length
-            ? `${offset + 1}–${offset + visible.length} of ${events.length} observations`
-            : "No observations match this selection."}
-        </p>
-        <div className="flex gap-2">
-          <button
-            className={button}
-            disabled={offset === 0}
-            onClick={() => setPage(Math.max(0, offset / 50 - 1))}
-            aria-label={`Previous ${label}`}
-          >
-            Previous
-          </button>
-          <button
-            className={button}
-            disabled={offset + 50 >= events.length}
-            onClick={() => setPage(offset / 50 + 1)}
-            aria-label={`Next ${label}`}
-          >
-            Next
-          </button>
-        </div>
-      </div>
-      <div
-        className="max-h-[32rem] overflow-auto rounded border border-slate-700"
-        tabIndex={0}
-        role="region"
-        aria-label={label}
-      >
-        <table className="w-full text-left text-sm">
-          <caption className="sr-only">
-            {label}, oldest first. Sequence breaks same-time ties.
-          </caption>
-          <thead className="sticky top-0 bg-slate-900 text-xs text-slate-300">
-            <tr>
-              {[
-                "Sequence / time",
-                "Observation",
-                "Identity / host",
-                "Details",
-              ].map((title) => (
-                <th key={title} scope="col" className="px-3 py-3 font-medium">
-                  {title}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((event) => (
-              <tr
-                key={event.sequence}
-                data-testid={testId}
-                data-selected={
-                  selectedSequence === event.sequence ? "true" : undefined
-                }
-                className={`border-t border-slate-800 align-top ${selectedSequence === event.sequence ? "bg-cyan-950/40" : ""}`}
-              >
-                <td className="px-3 py-3 font-mono text-xs">
-                  <span className="block">#{event.sequence}</span>
-                  <time
-                    className="mt-1 block"
-                    dateTime={event.occurredAt}
-                    title={event.occurredAt}
-                  >
-                    {seconds(event.simulationTimeMs)}
-                  </time>
-                  <span className="mt-1 block text-slate-400">
-                    {event.simulationTimeMs < 0 ? "Warm-up" : "Live"}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-xs">
-                  <span className="block">{event.type}</span>
-                  {"source" in event && (
-                    <>
-                      <span className="mt-1 block text-slate-400">
-                        {event.source}
-                      </span>
-                      <span className="mt-1 block">{event.severity}</span>
-                    </>
-                  )}
-                </td>
-                <td className="px-3 py-3 font-mono text-xs">
-                  <span className="block">
-                    {"userId" in event ? event.userId : "Host observation"}
-                  </span>
-                  <span className="mt-1 block text-slate-400">
-                    {event.hostId}
-                  </span>
-                </td>
-                <td className="max-w-xs px-3 py-3 text-xs">
-                  <p className="break-words">{describe(event)}</p>
-                  {onSelect && (
-                    <button
-                      type="button"
-                      aria-pressed={selectedSequence === event.sequence}
-                      className="mt-2 min-h-11 text-cyan-200 underline underline-offset-4"
-                      onClick={() => onSelect(event.sequence)}
-                    >
-                      Inspect event #{event.sequence}
-                    </button>
-                  )}
-                  <details className="mt-2">
-                    <summary className="min-h-8 cursor-pointer text-emerald-300">
-                      Raw event #{event.sequence}
-                    </summary>
-                    <pre className="max-w-64 overflow-auto whitespace-pre-wrap break-all py-2 text-xs">
-                      {JSON.stringify(event, null, 2)}
-                    </pre>
-                  </details>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
 
 export function TelemetryInspector({
   recording,
@@ -209,8 +52,10 @@ export function TelemetryInspector({
   onEntitySelect: (id: string | null) => void;
   onEventSelect: (sequence: number | null) => void;
 }) {
-  const [phase, setPhase] = useState("live");
-  const [kind, setKind] = useState("all");
+  const [eventFilters, setEventFilters] = useState<EventFilters>({
+    ...emptyEventFilters,
+    period: "live",
+  });
   const [identity, setIdentity] = useState("");
   const [hostId, setHostId] = useState("");
   const [windowMs, setWindowMs] = useState(10_000);
@@ -224,19 +69,6 @@ export function TelemetryInspector({
   const manifest = recording.run.manifest;
   const organization =
     manifest.schemaVersion === 2 ? manifest.organization : null;
-  const entity = selectedEntityId ?? "all";
-  const selectedEvent =
-    selectedEventSequence === null
-      ? undefined
-      : recording.events.find(
-          (event) => event.sequence === selectedEventSequence,
-        );
-  const visiblePhase = selectedEvent
-    ? selectedEvent.simulationTimeMs < 0
-      ? "warmup"
-      : "live"
-    : phase;
-  const visibleKind = selectedEvent ? "all" : kind;
   const profile =
     organization?.users.find((user) => user.userId === identity) ??
     organization?.users[0];
@@ -259,39 +91,18 @@ export function TelemetryInspector({
   const evidence = recording.events.filter((event) =>
     references.has(event.sequence),
   );
-  const events = recording.events.filter((event) => {
-    const selectedResource = organization?.resources.find(
-      (resource) => resource.id === entity,
-    );
-    const matchesEntity =
-      entity === "all" ||
-      event.hostId === entity ||
-      ("userId" in event && event.userId === entity) ||
-      (event.type === "network" && event.destinationHostId === entity) ||
-      (event.type === "authentication" && event.resource === entity) ||
-      (event.type === "dns" &&
-        selectedResource !== undefined &&
-        event.query === selectedResource.domain);
-    return (
-      event.simulationTimeMs <=
-        (snapshot?.simulationTimeMs ?? recording.run.simulationTimeMs) &&
-      (visiblePhase === "all" ||
-        (visiblePhase === "warmup"
-          ? event.simulationTimeMs < 0
-          : event.simulationTimeMs >= 0)) &&
-      (visibleKind === "all" || event.type === visibleKind) &&
-      matchesEntity
-    );
-  });
   function inspectHistory(id: string) {
     onEntitySelect(id);
     onEventSelect(null);
-    setPhase("warmup");
-    setKind("all");
+    setEventFilters({ ...emptyEventFilters, period: "warmup" });
     document.getElementById("events-title")?.focus();
     document
       .getElementById("events-title")
       ?.scrollIntoView({ block: "start", behavior: "instant" });
+  }
+  function inspectEvent(sequence: number) {
+    onEventSelect(sequence);
+    openInspectionDetail("events-title");
   }
 
   async function loadTruth() {
@@ -556,6 +367,7 @@ export function TelemetryInspector({
                 )}
                 label="Focus activity observations"
                 testId="activity-row"
+                onSelect={inspectEvent}
               />
             </details>
           )}
@@ -569,6 +381,7 @@ export function TelemetryInspector({
             events={evidence}
             label="Contributing observations"
             testId="evidence-row"
+            onSelect={inspectEvent}
           />
           <details className="mt-5 rounded border border-slate-600 p-4">
             <summary className="cursor-pointer font-medium">
@@ -590,84 +403,15 @@ export function TelemetryInspector({
         </section>
       )}
 
-      <section aria-labelledby="events-title" className="min-w-0">
-        <h3 id="events-title" tabIndex={-1} className="mb-2 font-medium">
-          Recorded events
-        </h3>
-        <p className="mb-4 text-sm text-slate-400">
-          Oldest first, ordered by sequence. Warning describes an observed
-          failure or high host utilization; it is not an attack label.
-          {snapshot &&
-            ` Showing observations through ${seconds(snapshot.simulationTimeMs)}, the selected snapshot’s time.`}
-        </p>
-        <div className="mb-4 grid min-w-0 gap-3 sm:grid-cols-3">
-          <label className="min-w-0 text-sm">
-            Activity period
-            <select
-              className={`${control} mt-2 block w-full`}
-              name="period"
-              value={visiblePhase}
-              onChange={(event) => {
-                onEventSelect(null);
-                setPhase(event.target.value);
-              }}
-            >
-              <option value="live">Live activity (0 s onward)</option>
-              <option value="warmup">Warm-up history (before 0 s)</option>
-              <option value="all">All recorded activity</option>
-            </select>
-          </label>
-          <label className="min-w-0 text-sm">
-            Event type
-            <select
-              className={`${control} mt-2 block w-full`}
-              name="event-type"
-              value={visibleKind}
-              onChange={(event) => {
-                onEventSelect(null);
-                setKind(event.target.value);
-              }}
-            >
-              <option value="all">All types</option>
-              {["authentication", "host-metric", "dns", "network"].map(
-                (type) => (
-                  <option key={type}>{type}</option>
-                ),
-              )}
-            </select>
-          </label>
-          <label className="min-w-0 text-sm">
-            Entity
-            <select
-              className={`${control} mt-2 block w-full`}
-              name="entity"
-              value={entity}
-              onChange={(event) => {
-                const value = event.target.value;
-                onEventSelect(null);
-                onEntitySelect(value === "all" ? null : value);
-              }}
-            >
-              <option value="all">All entities</option>
-              {manifest.initialState.users
-                .concat(
-                  manifest.initialState.hosts,
-                  organization?.resources.map((resource) => resource.id) ?? [],
-                )
-                .map((id) => (
-                  <option key={id}>{id}</option>
-                ))}
-            </select>
-          </label>
-        </div>
-        <EventTable
-          key={`${entity}:${visiblePhase}:${visibleKind}:${selectedEventSequence ?? "none"}`}
-          events={events}
-          label="Recorded telemetry events"
-          selectedSequence={selectedEventSequence}
-          onSelect={onEventSelect}
-        />
-      </section>
+      <EventExplorer
+        filters={eventFilters}
+        onFiltersChange={setEventFilters}
+        recording={recording}
+        selectedEntityId={selectedEntityId}
+        selectedEventSequence={selectedEventSequence}
+        onEntitySelect={onEntitySelect}
+        onEventSelect={onEventSelect}
+      />
 
       {manifest.schemaVersion === 2 && (
         <details className="rounded border border-slate-600 p-4">

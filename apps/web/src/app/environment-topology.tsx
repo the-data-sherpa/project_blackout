@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo } from "react";
 import type { ObservableEvent, Recording } from "@blackout/contracts";
+import { HostSamples } from "./host-samples";
+import { openInspectionDetail } from "./workspace-overview";
 import {
   buildTopology,
   maxAnimatedRelationships,
@@ -105,6 +107,15 @@ export function EnvironmentTopology({
   );
   const selectedNode =
     selection?.type === "node" ? nodeMap.get(selection.id) : undefined;
+  const selectedProfile = organization?.users.find(
+    (user) => user.userId === selectedNode?.id,
+  );
+  const selectedHost = organization?.hosts.find(
+    (host) => host.id === selectedNode?.id,
+  );
+  const selectedService = organization?.resources.find(
+    (service) => service.id === selectedNode?.id,
+  );
   const selectedRelationship =
     selection?.type === "relationship"
       ? relationshipMap.get(selection.id)
@@ -333,11 +344,56 @@ export function EnvironmentTopology({
             <p className="mt-2 text-sm text-slate-300">
               {selectedNode.explanation}
             </p>
+            <div
+              className="mt-2 break-words text-xs text-slate-300"
+              data-testid="entity-details"
+            >
+              {selectedProfile && (
+                <p>
+                  Department: {selectedProfile.department} · known devices:{" "}
+                  {selectedProfile.hostIds.join(", ")} · usual locations:{" "}
+                  {selectedProfile.locations.join(", ")} · usual resources:{" "}
+                  {selectedProfile.resources.join(", ")}
+                </p>
+              )}
+              {selectedHost && (
+                <p>
+                  {selectedHost.kind} · {selectedHost.location} ·{" "}
+                  {selectedHost.ip}
+                </p>
+              )}
+              {selectedService && (
+                <p>
+                  Domain: {selectedService.domain} · host:{" "}
+                  {selectedService.hostId}
+                </p>
+              )}
+            </div>
             <p className="mt-2 font-mono text-xs text-slate-400">
               Rule {topology.rule.id} · window (
               {(topology.cursorMs - topology.rule.windowMs) / 1000},{" "}
               {topology.cursorMs / 1000}] seconds · {topology.rule.expression}
             </p>
+            {(selectedNode.kind === "workstation" ||
+              selectedNode.kind === "server") && (
+              <HostSamples
+                recording={recording}
+                hostId={selectedNode.id}
+                onEventSelect={(sequence) => {
+                  onEventSelect(sequence);
+                  openInspectionDetail("events-title");
+                }}
+              />
+            )}
+            <button
+              className="mt-2 min-h-11 text-left text-xs text-cyan-200 underline underline-offset-4"
+              onClick={() => {
+                onEntitySelect(selectedNode.id);
+                openInspectionDetail("events-title");
+              }}
+            >
+              Explore all eligible events for {selectedNode.id}
+            </button>
           </>
         ) : selectedRelationship ? (
           <p className="mt-2 text-sm text-slate-300">
@@ -361,7 +417,10 @@ export function EnvironmentTopology({
                   type="button"
                   aria-pressed={selectedEventSequence === event.sequence}
                   className={`min-h-11 w-full rounded border border-slate-600 px-3 py-2 text-left text-xs hover:border-cyan-300 ${selectedEventSequence === event.sequence ? "bg-cyan-950/40 ring-2 ring-cyan-300" : ""}`}
-                  onClick={() => onEventSelect(event.sequence)}
+                  onClick={() => {
+                    onEventSelect(event.sequence);
+                    openInspectionDetail("events-title");
+                  }}
                 >
                   <span className="font-mono">
                     #{event.sequence} · {event.simulationTimeMs / 1000}s
