@@ -3,14 +3,14 @@ import {
   emptyEventFilters,
   eventEntities,
   type EventFilters,
-} from "./event-search";
+} from "./event-search.js";
 import {
   inspectAssessment,
   inspectBoundary,
   PlaybackIndex,
   type Inspection,
   type InspectionBoundary,
-} from "./playback";
+} from "./playback.js";
 
 export const judgmentKeys = [
   "compromise",

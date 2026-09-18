@@ -243,6 +243,14 @@ test("operates the compact workspace and traces held, applied, missing-confidenc
       "Received / held",
     );
     await page
+      .getByRole("button", { name: "Inspect latest attempt", exact: true })
+      .click();
+    await expect(page.getByText(/Received but not applied\./)).toBeVisible();
+    await expect(page.getByTestId("investigation-status")).toHaveText(
+      "Not opened",
+    );
+    await page.goto(heldLink);
+    await page
       .getByRole("button", { name: "Expand decision path", exact: true })
       .click();
     await graph

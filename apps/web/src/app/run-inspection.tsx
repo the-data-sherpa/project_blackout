@@ -140,7 +140,9 @@ export function RunInspection({
     const nextInspection = id
       ? inspection?.assessment?.id === id
         ? inspection
-        : inspectAssessment(source, id)
+        : inspection && projected.attempts.some((attempt) => attempt.id === id)
+          ? inspectAssessment(projected, id)
+          : inspectAssessment(source, id)
       : null;
     if (!id) onFollow();
     const assessment = nextInspection?.assessment;
