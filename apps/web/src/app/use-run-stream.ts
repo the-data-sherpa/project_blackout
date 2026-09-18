@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import {
   activeRunSchema,
   apiErrorSchema,
@@ -9,6 +9,7 @@ import {
   type Recording,
   type RunMessage,
 } from "@blackout/contracts";
+import type { TelemetryReceipt } from "./pipeline-health";
 import { receiveRunMessage } from "./run-stream";
 
 export function useRunStream({
@@ -28,6 +29,8 @@ export function useRunStream({
   setError: Dispatch<SetStateAction<string | null>>;
   setActiveRunId: Dispatch<SetStateAction<string | null>>;
 }) {
+  const [telemetryReceipt, setTelemetryReceipt] =
+    useState<TelemetryReceipt | null>(null);
   useEffect(() => {
     if (!runId) return;
     let disposed = false;
@@ -41,20 +44,32 @@ export function useRunStream({
     const controller = new AbortController();
     const signal = () =>
       AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]);
-    const commit = (recording: Recording) =>
+    const commit = (recording: Recording) => {
+      if (recording.events.length)
+        setTelemetryReceipt((previous) =>
+          previous?.runId === recording.run.id &&
+          previous.sequence >= recording.run.lastSequence
+            ? previous
+            : {
+                runId: recording.run.id,
+                sequence: recording.run.lastSequence,
+                wallMs: Date.now(),
+              },
+        );
       setRecording((previous) =>
         previous?.run.id === recording.run.id &&
         previous.run.revision > recording.run.revision
           ? previous
           : recording,
       );
-    function reconnect() {
+    };
+    function reconnect(state = "Disconnected") {
       if (disposed || retryTimer !== undefined) return;
       window.clearTimeout(timeout);
       window.clearTimeout(flushTimer);
       queue = [];
       flushTimer = undefined;
-      setStream("Disconnected");
+      setStream(state);
       retryTimer = window.setTimeout(
         () => {
           retryTimer = undefined;
@@ -81,12 +96,11 @@ export function useRunStream({
         else {
           setStream("Recorded");
           socket?.close();
-          void refreshActive().catch(reconnect);
+          void refreshActive().catch(() => reconnect());
         }
       } catch {
-        setStream("Resynchronizing");
+        reconnect("Resynchronizing");
         socket?.close();
-        reconnect();
       }
     }
     async function refreshActive() {
@@ -145,8 +159,8 @@ export function useRunStream({
             if (flushTimer === undefined)
               flushTimer = window.setTimeout(flush, 50);
           } catch {
+            reconnect("Resynchronizing");
             connection.close();
-            reconnect();
           }
         };
         connection.onclose = () => {
@@ -184,4 +198,5 @@ export function useRunStream({
     setError,
     setActiveRunId,
   ]);
+  return telemetryReceipt;
 }

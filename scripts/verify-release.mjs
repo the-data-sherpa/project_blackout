@@ -134,9 +134,14 @@ try {
   await page
     .getByRole("button", { name: "Simulation & details", exact: true })
     .click();
-  await page.getByRole("button", { name: "Pause", exact: true }).waitFor();
+  await page
+    .getByRole("button", { name: "Pause simulation", exact: true })
+    .waitFor();
   await until(
-    () => page.getByRole("button", { name: "Pause", exact: true }).isEnabled(),
+    () =>
+      page
+        .getByRole("button", { name: "Pause simulation", exact: true })
+        .isEnabled(),
     Boolean,
     "live socket controls",
   );
@@ -153,7 +158,9 @@ try {
     (saved) => saved.run.simulationTimeMs >= onset + 15000,
     "escalation observations",
   );
-  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Pause simulation", exact: true })
+    .click();
   const paused = await api(`/api/runs/${id}`);
   await delay(500);
   assert.equal(
@@ -164,7 +171,9 @@ try {
     .getByRole("button", { name: /user .* Suspicious evidence/ })
     .first()
     .click();
-  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Resume simulation", exact: true })
+    .click();
   await page.getByRole("button", { name: "Stop Attack", exact: true }).click();
   const stopped = await api(`/api/runs/${id}`);
   const finished = await until(
@@ -197,10 +206,15 @@ try {
   await page
     .getByRole("button", { name: "Simulation & details", exact: true })
     .click();
-  await page.getByRole("button", { name: "Pause", exact: true }).waitFor();
+  await page
+    .getByRole("button", { name: "Pause simulation", exact: true })
+    .waitFor();
   await compose("stop", "server");
   await until(
-    () => page.getByRole("button", { name: "Pause", exact: true }).isDisabled(),
+    () =>
+      page
+        .getByRole("button", { name: "Pause simulation", exact: true })
+        .isDisabled(),
     Boolean,
     "disconnected controls",
   );

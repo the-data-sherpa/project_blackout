@@ -22,6 +22,7 @@ export function RunBrowser({
   onSelect,
   onActiveRun,
   onDeleted,
+  onRunsLoaded,
 }: {
   backendUrl: string;
   selectedId: string | null;
@@ -29,6 +30,7 @@ export function RunBrowser({
   onSelect: (id: string) => void;
   onActiveRun: (id: string | null) => void;
   onDeleted: (id: string) => void;
+  onRunsLoaded?: (runs: RunList["runs"]) => void;
 }) {
   const [page, setPage] = useState<RunList | null>(null);
   const [offset, setOffset] = useState(0);
@@ -67,6 +69,7 @@ export function RunBrowser({
         const stored = storageUsageSchema.parse(await usage!.json());
         if (!disposed) {
           setPage(saved);
+          onRunsLoaded?.(saved.runs);
           setStorage(stored);
           onActiveRun(saved.activeRunId);
         }
@@ -83,7 +86,7 @@ export function RunBrowser({
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [backendUrl, offset, attempt, refreshKey, onActiveRun]);
+  }, [backendUrl, offset, attempt, refreshKey, onActiveRun, onRunsLoaded]);
 
   async function deleteRun(run: RunList["runs"][number]) {
     if (

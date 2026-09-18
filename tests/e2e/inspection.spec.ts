@@ -163,6 +163,12 @@ test("pins every view while real streamed recording continues, including held re
     await expect(page.getByTestId("investigation-status")).toHaveText(
       "Not opened",
     );
+    expect(new URL(page.url()).searchParams.get("phase")).toBe("received");
+    await page.reload();
+    await expect(page.getByText(/Received but not applied\./)).toBeVisible();
+    await expect(page.getByTestId("investigation-status")).toHaveText(
+      "Not opened",
+    );
     await page
       .getByRole("button", { name: "Return to live", exact: true })
       .click();

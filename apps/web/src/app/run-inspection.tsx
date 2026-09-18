@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Recording } from "@blackout/contracts";
 import { DecisionInspector } from "./decision-inspector";
 import {
@@ -17,6 +17,15 @@ import {
 } from "./playback";
 import { ProcessingOverview } from "./workspace-overview";
 import { JudgmentOverview } from "./judgment-overview";
+import {
+  defaultInspectionView,
+  inspectionUrl,
+  restoreInspection,
+  type InspectionView,
+  type JudgmentKey,
+} from "./inspection-link";
+import { InspectedAssessmentHealth } from "./pipeline-health";
+import { emptyEventFilters } from "./event-search";
 
 export function RunInspection({
   recording,
@@ -26,6 +35,7 @@ export function RunInspection({
   readOnly = false,
   backendUrl,
   onSaved,
+  onFollow,
 }: {
   recording: Recording;
   source?: Recording;
@@ -34,22 +44,54 @@ export function RunInspection({
   readOnly?: boolean;
   backendUrl: string;
   onSaved: (recording: Recording) => void;
+  onFollow: () => void;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(() =>
+  const [restored] = useState(() =>
     typeof window === "undefined"
-      ? null
-      : new URL(window.location.href).searchParams.get("decision"),
+      ? { state: defaultInspectionView, inspection: null, notice: null }
+      : restoreInspection(new URL(window.location.href), source),
   );
-  const [inspection, setInspection] = useState<Inspection | null>(() =>
-    selectedId ? inspectAssessment(source, selectedId) : null,
+  const [view, setView] = useState(restored.state);
+  const pendingUrl = useRef<URL | null>(null);
+  const viewRef = useRef(view);
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+  const [inspection, setInspection] = useState<Inspection | null>(
+    restored.inspection,
   );
-  const [topologySelection, setTopologySelection] =
-    useState<TopologySelection>(null);
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
-  const [selectedEventSequence, setSelectedEventSequence] = useState<
-    number | null
-  >(null);
-  const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
+  const [topologySelection, setTopologySelection] = useState<TopologySelection>(
+    () => entitySelection(restored.state.entity, source),
+  );
+  const [selectionNotice, setSelectionNotice] = useState<string | null>(
+    restored.notice,
+  );
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
+  const selectedId = view.decision;
+  const selectedEntityId = view.entity;
+  const selectedEventSequence = view.event;
+
+  function update(patch: Partial<InspectionView>, nextInspection = inspection) {
+    const next = { ...viewRef.current, ...patch };
+    viewRef.current = next;
+    setView(next);
+    setInspection(nextInspection);
+    setCopyNotice(null);
+    const url = inspectionUrl(
+      window.location.href,
+      source.run.id,
+      next,
+      nextInspection?.recording.run.simulationTimeMs ?? null,
+    );
+    if (!pendingUrl.current)
+      queueMicrotask(() => {
+        const nextUrl = pendingUrl.current;
+        pendingUrl.current = null;
+        if (nextUrl && nextUrl.href !== window.location.href)
+          window.history.pushState(null, "", nextUrl);
+      });
+    pendingUrl.current = url;
+  }
   const projected = inspection?.recording ?? recording;
   const eventSequence = projected.events.some(
     (event) => event.sequence === selectedEventSequence,
@@ -57,7 +99,7 @@ export function RunInspection({
     ? selectedEventSequence
     : null;
   if (selectedEventSequence !== null && eventSequence === null) {
-    setSelectedEventSequence(null);
+    setView({ ...view, event: null });
     setSelectionNotice(
       `Event #${selectedEventSequence} is unavailable at this cursor. Its selection was cleared.`,
     );
@@ -65,31 +107,26 @@ export function RunInspection({
 
   function selectEvent(sequence: number | null) {
     setSelectionNotice(null);
-    setSelectedEventSequence(sequence);
+    update({ event: sequence });
   }
 
   function selectEntity(id: string | null) {
-    setSelectedEntityId(id);
-    const manifest = projected.run.manifest;
-    const organization =
-      manifest.schemaVersion === 2 ? manifest.organization : null;
-    const kind =
-      organization?.hosts.find((host) => host.id === id)?.kind ??
-      (organization?.users.some((user) => user.userId === id)
-        ? "user"
-        : "service");
-    setTopologySelection(
-      id && organization ? { type: "node", id: `${kind}:${id}` } : null,
-    );
+    update({ entity: id });
+    setTopologySelection(entitySelection(id, projected));
   }
 
-  function select(id: string | null) {
-    setSelectedId(id);
-    setInspection(id ? inspectAssessment(source, id) : null);
-    const url = new URL(window.location.href);
-    if (id) url.searchParams.set("decision", id);
-    else url.searchParams.delete("decision");
-    window.history.replaceState(null, "", url);
+  function select(id: string | null, judgment: JudgmentKey | null = null) {
+    const nextInspection = id ? inspectAssessment(source, id) : null;
+    if (!id) onFollow();
+    const assessment = nextInspection?.assessment;
+    const phase = !assessment
+      ? null
+      : assessment.status === "pending"
+        ? "pending"
+        : assessment.appliedAt === null
+          ? "received"
+          : "applied";
+    update({ decision: id, judgment, phase }, nextInspection);
   }
 
   function selectSnapshot(id: string) {
@@ -99,11 +136,30 @@ export function RunInspection({
     }
     const snapshot = source.snapshots.find((item) => item.id === id);
     if (!snapshot) return;
-    select(null);
-    setInspection({
-      recording: new PlaybackIndex(source).at(snapshot.simulationTimeMs),
-      assessment: null,
-    });
+    update(
+      { decision: null, judgment: null },
+      {
+        recording: new PlaybackIndex(source).at(snapshot.simulationTimeMs),
+        assessment: null,
+      },
+    );
+  }
+
+  async function copyLink() {
+    const url = inspectionUrl(
+      window.location.href,
+      source.run.id,
+      { ...view, event: eventSequence },
+      projected.run.simulationTimeMs,
+    );
+    try {
+      await navigator.clipboard.writeText(url.href);
+      setCopyNotice("Inspection link copied.");
+    } catch {
+      setCopyNotice(
+        "Clipboard unavailable. Select and copy the inspection link below.",
+      );
+    }
   }
 
   return (
@@ -124,6 +180,10 @@ export function RunInspection({
                 : "Following playback"}{" "}
             · {(projected.run.simulationTimeMs / 1000).toFixed(1)} s
           </p>
+          <InspectedAssessmentHealth
+            recording={projected}
+            assessment={inspection?.assessment ?? null}
+          />
           {inspection && (
             <p
               className="mt-2 text-sm text-slate-300"
@@ -137,6 +197,12 @@ export function RunInspection({
             </p>
           )}
         </div>
+        <button
+          className="min-h-11 rounded border border-slate-500 px-3 text-sm"
+          onClick={() => void copyLink()}
+        >
+          Copy inspection link
+        </button>
         {inspection && (
           <button
             className="min-h-11 rounded border border-cyan-300 px-4 py-2 text-sm"
@@ -148,6 +214,29 @@ export function RunInspection({
           </button>
         )}
       </section>
+      {copyNotice && (
+        <div className="mb-3 min-w-0 text-sm" role="status">
+          <p>{copyNotice}</p>
+          {copyNotice.startsWith("Clipboard") && (
+            <input
+              aria-label="Inspection link"
+              className="min-h-11 w-full bg-slate-950"
+              readOnly
+              value={
+                inspectionUrl(
+                  typeof window === "undefined"
+                    ? "http://localhost"
+                    : window.location.href,
+                  source.run.id,
+                  { ...view, event: eventSequence },
+                  projected.run.simulationTimeMs,
+                ).href
+              }
+              onFocus={(event) => event.target.select()}
+            />
+          )}
+        </div>
+      )}
       {selectionNotice && (
         <p role="status" className="mb-3 text-sm text-amber-200">
           {selectionNotice}
@@ -177,7 +266,7 @@ export function RunInspection({
               }
               setTopologySelection(selection);
             }}
-            onEntitySelect={setSelectedEntityId}
+            onEntitySelect={(entity) => update({ entity })}
             onEventSelect={selectEvent}
             onDecisionSelect={select}
           />
@@ -188,11 +277,29 @@ export function RunInspection({
           historical={inspection !== null}
           inspectedAttempt={inspection?.assessment ?? null}
           onInspect={select}
+          selectedJudgment={view.judgment}
         />
       </div>
       <ProcessingOverview
         recording={projected}
         assessment={inspection?.assessment ?? null}
+        onInspect={select}
+        onEvidence={(throughMs) =>
+          update({
+            entity: null,
+            filters: {
+              ...emptyEventFilters,
+              through: String(throughMs / 1000),
+            },
+          })
+        }
+      />
+      <InvestigationPanel
+        recording={projected}
+        connected={connected}
+        readOnly={readOnly || inspection !== null}
+        backendUrl={backendUrl}
+        onSaved={onSaved}
         onInspect={select}
       />
       <DecisionInspector
@@ -203,14 +310,6 @@ export function RunInspection({
         availableAttempts={source.attempts}
         historical={inspection !== null}
         onSelect={select}
-      />
-      <InvestigationPanel
-        recording={projected}
-        connected={connected}
-        readOnly={readOnly || inspection !== null}
-        backendUrl={backendUrl}
-        onSaved={onSaved}
-        onInspect={select}
       />
       <TelemetryInspector
         recording={projected}
@@ -224,7 +323,23 @@ export function RunInspection({
         selectedEventSequence={eventSequence}
         onEntitySelect={selectEntity}
         onEventSelect={selectEvent}
+        eventFilters={view.filters}
+        onFiltersChange={(filters) => update({ filters })}
       />
     </>
   );
+}
+
+function entitySelection(
+  id: string | null,
+  recording: Recording,
+): TopologySelection {
+  const manifest = recording.run.manifest;
+  if (!id || manifest.schemaVersion !== 2) return null;
+  const kind =
+    manifest.organization.hosts.find((host) => host.id === id)?.kind ??
+    (manifest.organization.users.some((user) => user.userId === id)
+      ? "user"
+      : "service");
+  return { type: "node", id: `${kind}:${id}` };
 }

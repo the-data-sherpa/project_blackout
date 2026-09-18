@@ -1,12 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import {
-  investigationStatus,
-  type InferenceAttempt,
-  type Recording,
-} from "@blackout/contracts";
-import { visibleAttempts } from "./decision-view";
+import type { InferenceAttempt, Recording } from "@blackout/contracts";
+import { processingGraph } from "./processing-graph";
 
 export function openInspectionDetail(id: string) {
   const element = document.getElementById(id);
@@ -18,27 +14,19 @@ export function ProcessingOverview({
   recording,
   assessment,
   onInspect,
+  onEvidence,
 }: {
   recording: Recording;
   assessment: InferenceAttempt | null;
   onInspect: (id: string) => void;
+  onEvidence: (throughMs: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const status = investigationStatus(recording.investigationHistory);
-  const attempt = assessment ?? visibleAttempts(recording).at(-1);
-  const snapshot = attempt
-    ? recording.snapshots.find((item) => item.id === attempt.snapshotId)
-    : recording.snapshots.at(-1);
-  const evidenceTime =
-    snapshot?.simulationTimeMs ?? recording.run.simulationTimeMs;
-  const evidenceCount = recording.events.filter(
-    (event) => event.simulationTimeMs <= evidenceTime,
-  ).length;
-  const applied =
-    attempt?.status === "succeeded" &&
-    attempt.appliedAt !== null &&
-    (attempt.appliedSimulationTimeMs ?? attempt.simulationTimeMs) <=
-      recording.run.simulationTimeMs;
+  const [selected, setSelected] = useState<string | null>(null);
+  const graph = processingGraph(recording, assessment);
+  const node = graph.stages
+    .flatMap((stage) => stage.nodes)
+    .find((item) => item.id === selected);
   return (
     <section
       className="monitor-panel processing-overview"
@@ -48,7 +36,7 @@ export function ProcessingOverview({
       <header className="monitor-panel-heading flex flex-wrap justify-between gap-2">
         <h2 id="processing-title">Recorded decision path</h2>
         <p>
-          Checkpoint {evidenceTime / 1000} s · recorded application behavior
+          Checkpoint {graph.evidenceTime / 1000} s · {graph.state}
         </p>
         <button
           type="button"
@@ -59,61 +47,101 @@ export function ProcessingOverview({
           {expanded ? "Collapse decision path" : "Expand decision path"}
         </button>
       </header>
+      <p className="px-4 pt-2 text-xs text-slate-400">
+        Recorded application behavior. Advisory response is not an incident
+        gate.{" "}
+        {graph.attempt?.policy?.config.version ??
+          "Policy provenance unavailable"}
+        .
+        {graph.attempt?.appliedAt === undefined &&
+          graph.attempt &&
+          " Legacy application timing unavailable."}
+      </p>
+      {!expanded && (
+        <div className="processing-summary">
+          {graph.stages.map((stage, index) => (
+            <button
+              key={stage.label}
+              className="processing-step min-h-11"
+              onClick={() => setExpanded(true)}
+            >
+              <span className="block font-mono text-[0.65rem] text-slate-400">
+                {stage.label} {index < 4 ? "→" : ""}
+              </span>
+              <span className="block text-xs text-cyan-100">
+                {index === 2
+                  ? stage.nodes.map((item) => item.value).join(" · ")
+                  : index === 3
+                    ? (graph.attempt?.policy?.outcome ?? "Unavailable")
+                    : stage.nodes[0]?.value}
+              </span>
+              <span className="text-xs text-slate-400">
+                Inspect {index === 3 ? "every condition" : "recorded details"}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="processing-steps" data-expanded={expanded}>
-        {[
-          [
-            "01 / Evidence",
-            `${evidenceCount.toLocaleString("en-US")} observations`,
-            "Recorded events including warm-up",
-            "events-title",
-          ],
-          [
-            "02 / Input",
-            snapshot?.id ?? "No snapshot",
-            "Observable state only",
-            "state-title",
-          ],
-          [
-            "03 / Judgments",
-            attempt
-              ? `${attempt.status}${applied ? " · applied" : " · not applied"}`
-              : "Not evaluated",
-            "Four global SystemOne outputs",
-            "decision-title",
-          ],
-          [
-            "04 / Policy",
-            attempt?.policy?.outcome ?? "Not available",
-            "Recorded advisory conditions",
-            "decision-title",
-          ],
-          [
-            "05 / Investigation",
-            status === "none" ? "Not opened" : status,
-            `${recording.investigationHistory.length} recorded transitions`,
-            "investigation-title",
-          ],
-        ].map(([label, value, detail, target]) => (
-          <button
-            key={label}
-            className="processing-step"
-            disabled={target === "state-title" && !snapshot}
-            onClick={() => {
-              if (attempt && target !== "investigation-title")
-                onInspect(attempt.id);
-              openInspectionDetail(target!);
-            }}
-          >
-            <span className="block font-mono text-[0.65rem] uppercase tracking-wider text-slate-400">
-              {label}
-            </span>
-            <strong className="my-2 block break-words text-sm font-normal text-slate-100">
-              {value}
-            </strong>
-            <span className="block text-xs text-slate-400">{detail} ↗</span>
-          </button>
+        {graph.stages.map((stage, index) => (
+          <div key={stage.label} className="min-w-0">
+            <p className="mb-2 font-mono text-[0.65rem] text-slate-400">
+              {stage.label} {index < 4 ? "→" : ""}
+            </p>
+            <div className="processing-nodes grid gap-1">
+              {stage.nodes.map((item) => (
+                <button
+                  key={item.id}
+                  className="processing-step min-h-8 w-full"
+                  aria-pressed={selected === item.id}
+                  onClick={() => setSelected(item.id)}
+                >
+                  <span className="block break-words text-xs text-slate-300">
+                    {item.label}
+                  </span>
+                  <strong className="block text-xs font-medium text-cyan-100">
+                    {item.value}
+                  </strong>
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
+      {node && (
+        <div
+          className="mx-4 mb-4 min-w-0 rounded border border-slate-600 p-3"
+          role="region"
+          aria-label="Decision path detail"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm">
+              {node.label} · {node.value}
+            </h3>
+            <button
+              className="min-h-11 text-sm text-cyan-200 underline"
+              onClick={() => {
+                if (node.id === "events") onEvidence(graph.evidenceTime);
+                else if (graph.attempt && node.target !== "investigation-title")
+                  onInspect(graph.attempt.id);
+                openInspectionDetail(node.target);
+              }}
+            >
+              Open{" "}
+              {node.id === "events" ? "recorded members" : "full inspector"}
+            </button>
+            <button
+              className="min-h-11 text-sm underline"
+              onClick={() => setSelected(null)}
+            >
+              Close node detail
+            </button>
+          </div>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs text-slate-300">
+            {JSON.stringify(node.detail, null, 2)}
+          </pre>
+        </div>
+      )}
     </section>
   );
 }

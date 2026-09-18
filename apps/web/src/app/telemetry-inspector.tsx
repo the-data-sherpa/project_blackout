@@ -41,6 +41,8 @@ export function TelemetryInspector({
   selectedEventSequence = null,
   onEntitySelect,
   onEventSelect,
+  eventFilters,
+  onFiltersChange: setEventFilters,
 }: {
   recording: Recording;
   backendUrl: string;
@@ -51,11 +53,9 @@ export function TelemetryInspector({
   selectedEventSequence?: number | null;
   onEntitySelect: (id: string | null) => void;
   onEventSelect: (sequence: number | null) => void;
+  eventFilters: EventFilters;
+  onFiltersChange: (filters: EventFilters) => void;
 }) {
-  const [eventFilters, setEventFilters] = useState<EventFilters>({
-    ...emptyEventFilters,
-    period: "live",
-  });
   const [identity, setIdentity] = useState("");
   const [hostId, setHostId] = useState("");
   const [windowMs, setWindowMs] = useState(10_000);

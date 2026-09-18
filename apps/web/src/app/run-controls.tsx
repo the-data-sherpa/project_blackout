@@ -18,12 +18,14 @@ export function RunControls({
   canReset,
   backendUrl,
   onSaved,
+  onNewRun,
 }: {
   recording: Recording;
   connected: boolean;
   canReset: boolean;
   backendUrl: string;
   onSaved: (saved: Recording) => void;
+  onNewRun: () => void;
 }) {
   const mounted = useRef(true);
   useEffect(() => {
@@ -99,21 +101,29 @@ export function RunControls({
     return (
       <section
         aria-label="Simulation controls"
-        className="mb-6 space-y-3 rounded border border-slate-700 p-4"
+        className="mb-3 space-y-2 rounded border border-slate-700 p-3"
       >
-        <button
-          className={button}
-          disabled={!canReset || sending || retry !== null}
-          onClick={() =>
-            void send({ commandId: crypto.randomUUID(), type: "reset" })
-          }
-        >
-          Reset run
-        </button>
-        <p className="text-xs text-slate-400">
-          Reset starts the same seed from zero and retains this recording.
-          Available when no other run is active.
-        </p>
+        <details id="simulation-controls">
+          <summary className="min-h-8 cursor-pointer text-sm">
+            Simulation controls
+          </summary>
+          <button className={button} onClick={onNewRun}>
+            Set up a new run
+          </button>
+          <button
+            className={button}
+            disabled={!canReset || sending || retry !== null}
+            onClick={() =>
+              void send({ commandId: crypto.randomUUID(), type: "reset" })
+            }
+          >
+            Reset run
+          </button>
+          <p className="text-xs text-slate-400">
+            Reset starts the same seed from zero and retains this recording.
+            Available when no other run is active.
+          </p>
+        </details>
         {error && (
           <p role="alert" className="text-sm text-amber-200">
             {error}
@@ -133,7 +143,7 @@ export function RunControls({
   return (
     <section
       aria-label="Simulation controls"
-      className="mb-6 space-y-4 rounded border border-emerald-400/40 bg-emerald-950/10 p-4"
+      className="mb-3 space-y-2 rounded border border-emerald-400/40 bg-emerald-950/10 p-3"
     >
       <div className="flex flex-wrap items-center gap-3">
         <button
@@ -146,10 +156,10 @@ export function RunControls({
             })
           }
         >
-          {controls.paused ? "Resume" : "Pause"}
+          {controls.paused ? "Resume" : "Pause"} simulation
         </button>
         <label className="flex min-w-0 items-center gap-2 text-sm">
-          Requested speed
+          Simulation speed
           <select
             aria-label="Requested speed"
             value={controls.requestedSpeed}
@@ -170,78 +180,95 @@ export function RunControls({
             ))}
           </select>
         </label>
-        <button
-          className={button}
-          disabled={disabled}
-          onClick={() =>
-            void send({ commandId: crypto.randomUUID(), type: "reset" })
-          }
-        >
-          Reset run
-        </button>
       </div>
-      {interactive && (
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="min-w-0 text-sm">
-            Scenario
-            <select
-              value={scenario}
-              disabled={disabled || injecting}
-              className="mt-2 block min-h-11 max-w-full rounded border border-slate-500 bg-slate-950 px-3"
-              onChange={(event) =>
-                setScenario(interactiveFixtureSchema.parse(event.target.value))
-              }
-            >
-              <option value="credential-compromise">
-                Credential compromise
-              </option>
-              <option value="benign-maintenance">Benign maintenance</option>
-            </select>
-          </label>
+      <details id="simulation-controls" className="space-y-2">
+        <summary className="min-h-8 cursor-pointer text-sm">
+          Simulation controls
+        </summary>
+        <div className="flex flex-wrap gap-3">
           <button
             className={button}
-            disabled={
-              disabled ||
-              injecting ||
-              run.simulationTimeMs >= run.manifest.durationSeconds * 1000
+            disabled={disabled}
+            onClick={() =>
+              void send({ commandId: crypto.randomUUID(), type: "reset" })
             }
+          >
+            Reset run
+          </button>
+          <button className={button} onClick={onNewRun}>
+            Set up a new run
+          </button>
+        </div>
+        {interactive && (
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="min-w-0 text-sm">
+              Scenario
+              <select
+                value={scenario}
+                disabled={disabled || injecting}
+                className="mt-2 block min-h-11 max-w-full rounded border border-slate-500 bg-slate-950 px-3"
+                onChange={(event) =>
+                  setScenario(
+                    interactiveFixtureSchema.parse(event.target.value),
+                  )
+                }
+              >
+                <option value="credential-compromise">
+                  Credential compromise
+                </option>
+                <option value="benign-maintenance">Benign maintenance</option>
+              </select>
+            </label>
+            <button
+              className={button}
+              disabled={
+                disabled ||
+                injecting ||
+                run.simulationTimeMs >= run.manifest.durationSeconds * 1000
+              }
+              onClick={() =>
+                void send({
+                  commandId: crypto.randomUUID(),
+                  type: "begin-injection",
+                  fixture: scenario,
+                })
+              }
+            >
+              {scenario === "credential-compromise"
+                ? "Begin Attack"
+                : "Begin Control"}
+            </button>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            className={button}
+            disabled={disabled || !injecting}
             onClick={() =>
               void send({
                 commandId: crypto.randomUUID(),
-                type: "begin-injection",
-                fixture: scenario,
+                type: "stop-injection",
               })
             }
           >
-            {scenario === "credential-compromise"
-              ? "Begin Attack"
-              : "Begin Control"}
+            {controls.injection?.fixture === "benign-maintenance"
+              ? "Stop Control"
+              : "Stop Attack"}
           </button>
+          <p className="text-sm text-slate-300">
+            {injecting
+              ? `Injecting ${controls.injection!.fixture === "credential-compromise" ? "attack" : "benign control"} activity`
+              : interactive
+                ? "Normal mode — baseline telemetry"
+                : "Scheduled fixture"}
+          </p>
         </div>
-      )}
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          className={button}
-          disabled={disabled || !injecting}
-          onClick={() =>
-            void send({
-              commandId: crypto.randomUUID(),
-              type: "stop-injection",
-            })
-          }
-        >
-          {controls.injection?.fixture === "benign-maintenance"
-            ? "Stop Control"
-            : "Stop Attack"}
-        </button>
-        <p className="text-sm text-slate-300">
-          {injecting
-            ? `Injecting ${controls.injection!.fixture === "credential-compromise" ? "attack" : "benign control"} activity`
-            : interactive
-              ? "Normal mode — baseline telemetry"
-              : "Scheduled fixture"}
+        <p className="text-xs text-slate-400">
+          Stop ends injection; baseline traffic continues and existing evidence
+          remains. Scenarios end after 30 simulation seconds. Reset starts the
+          same seed from zero and retains this recording.
         </p>
-      </div>
+      </details>
       <p role="status" className="text-sm text-emerald-200">
         {!connected
           ? "Controls unavailable while reconnecting."
@@ -259,11 +286,6 @@ export function RunControls({
         Average progress:{" "}
         {elapsed > 0 ? (run.simulationTimeMs / elapsed).toFixed(2) : "0.00"}×
         since start, including pauses and inference waits.
-      </p>
-      <p className="text-xs text-slate-400">
-        Stop ends injection; baseline traffic continues and existing evidence
-        remains. Scenarios end after 30 simulation seconds. Reset starts the
-        same seed from zero and retains this recording.
       </p>
       {error && (
         <p role="alert" className="text-sm text-amber-200">

@@ -1,6 +1,7 @@
 "use client";
 
 import type { InferenceAttempt, Recording } from "@blackout/contracts";
+import type { JudgmentKey } from "./inspection-link";
 import { judgmentView, numericChange } from "./judgment-view";
 import { openInspectionDetail } from "./workspace-overview";
 
@@ -39,12 +40,14 @@ export function JudgmentOverview({
   historical,
   inspectedAttempt,
   onInspect,
+  selectedJudgment,
 }: {
   recording: Recording;
   connected: boolean;
   historical: boolean;
   inspectedAttempt: InferenceAttempt | null;
-  onInspect: (id: string) => void;
+  onInspect: (id: string, judgment?: JudgmentKey) => void;
+  selectedJudgment: JudgmentKey | null;
 }) {
   const { current, previous, latest, state, ageMs } = judgmentView(
     recording,
@@ -112,7 +115,7 @@ export function JudgmentOverview({
           : noComparison,
       answer: answers?.response,
     },
-  ];
+  ] as const;
 
   return (
     <section
@@ -153,8 +156,10 @@ export function JudgmentOverview({
             <button
               type="button"
               className="judgment-heading"
+              aria-pressed={selectedJudgment === card.key}
               onClick={() => {
-                if (current ?? latest) onInspect((current ?? latest)!.id);
+                if (current ?? latest)
+                  onInspect((current ?? latest)!.id, card.key);
                 openInspectionDetail("decision-title");
               }}
             >

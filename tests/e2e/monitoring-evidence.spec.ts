@@ -183,6 +183,9 @@ test("shows validated distributions together through pending, retry, held, failu
     await expect(page.getByTestId("judgment-state")).toHaveText(
       "Retrying · attempt 2",
     );
+    await expect(page.getByTestId("pipeline-evaluation")).toHaveText(
+      "Retrying",
+    );
     await expect(page.getByTestId("judgment-value")).toHaveText([
       "10.0%",
       "normal",

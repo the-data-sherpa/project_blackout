@@ -157,6 +157,7 @@ export function EventExplorer({
             Entity
             <select
               name="entity"
+              aria-label="Entity"
               value={selectedEntityId ?? "all"}
               onChange={(event) =>
                 onEntitySelect(
@@ -166,6 +167,11 @@ export function EventExplorer({
               className={`${control} mt-2 block w-full`}
             >
               <option value="all">All entities</option>
+              {selectedEntityId && !entities.includes(selectedEntityId) && (
+                <option value={selectedEntityId}>
+                  {selectedEntityId} · unavailable at this cursor
+                </option>
+              )}
               {entities.map((id) => (
                 <option key={id}>{id}</option>
               ))}

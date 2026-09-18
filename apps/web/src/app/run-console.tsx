@@ -12,10 +12,12 @@ import {
   runListSchema,
   startRunSchema,
   type Recording,
+  type RunList,
 } from "@blackout/contracts";
 import { RunBrowser } from "./run-browser";
 import { EvaluationReports } from "./evaluation-reports";
 import { useRunStream } from "./use-run-stream";
+import { PipelineHealth } from "./pipeline-health";
 import { RunControls } from "./run-controls";
 import { RecordedPlayback } from "./recorded-playback";
 
@@ -37,6 +39,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
   const [interactive, setInteractive] = useState(false);
   const [seed, setSeed] = useState("blackout-demo-001");
   const [duration, setDuration] = useState("30");
+  const [recentRuns, setRecentRuns] = useState<RunList["runs"]>([]);
   const [runId, setRunId] = useState<string | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [recording, setRecording] = useState<Recording | null>(null);
@@ -49,6 +52,19 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
   const [operation, setOperation] = useState<"rerun" | "reevaluation" | null>(
     null,
   );
+
+  useEffect(() => {
+    const navigate = () => {
+      setRecording(null);
+      setRunId(null);
+      setBusy(true);
+      setError(null);
+      setView("monitor");
+      setSetupAttempt((value) => value + 1);
+    };
+    window.addEventListener("popstate", navigate);
+    return () => window.removeEventListener("popstate", navigate);
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -101,7 +117,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
     };
   }, [backendUrl, setupAttempt]);
 
-  useRunStream({
+  const telemetryReceipt = useRunStream({
     backendUrl,
     runId,
     attempt,
@@ -144,9 +160,10 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
       setView("monitor");
       setActiveRunId(saved.run.id);
       const url = new URL(window.location.href);
+      url.search = "";
+      url.hash = "";
       url.searchParams.set("run", saved.run.id);
-      url.searchParams.delete("decision");
-      window.history.replaceState(null, "", url);
+      window.history.pushState(null, "", url);
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -185,9 +202,10 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
       setRunId(saved.run.id);
       setView("monitor");
       const url = new URL(window.location.href);
+      url.search = "";
+      url.hash = "";
       url.searchParams.set("run", saved.run.id);
-      url.searchParams.delete("decision");
-      window.history.replaceState(null, "", url);
+      window.history.pushState(null, "", url);
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -207,14 +225,15 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
     setRunId(id);
     setAttempt((value) => value + 1);
     const url = new URL(window.location.href);
+    url.search = "";
+    url.hash = "";
     url.searchParams.set("run", id);
-    url.searchParams.delete("decision");
-    window.history.replaceState(null, "", url);
+    window.history.pushState(null, "", url);
   }
   const loading = busy || (runId !== null && run?.id !== runId);
   return (
     <section
-      className="min-w-0 space-y-4 py-4"
+      className="min-w-0 space-y-3 py-2"
       aria-labelledby="workspace-title"
     >
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -400,6 +419,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
           selectedId={runId}
           refreshKey={`${run?.id ?? ""}:${run?.status ?? ""}`}
           onSelect={selectRun}
+          onRunsLoaded={setRecentRuns}
           onActiveRun={setActiveRunId}
           onDeleted={(id) => {
             setDeletionRevision((value) => value + 1);
@@ -491,11 +511,40 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
                 {run.id}
               </p>
             </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+              <label className="flex min-w-0 items-center gap-2">
+                Recording
+                <select
+                  aria-label="Recording selector"
+                  className="min-h-11 min-w-0 max-w-52 rounded border border-slate-600 bg-slate-950 px-2"
+                  value={run.id}
+                  onChange={(event) => selectRun(event.target.value)}
+                >
+                  {!recentRuns.some((item) => item.id === run.id) && (
+                    <option value={run.id}>{run.manifest.seed}</option>
+                  )}
+                  {recentRuns.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.seed} · {item.status}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="min-h-11 text-cyan-200 underline"
+                onClick={() => setView("recordings")}
+              >
+                Browse all recordings
+              </button>
+            </div>
             <div className="flex flex-wrap gap-2">
               <button
                 className={buttonClass}
                 onClick={() => {
-                  const details = document.getElementById("simulation-details");
+                  const details =
+                    (run.status === "running"
+                      ? document.getElementById("simulation-controls")
+                      : null) ?? document.getElementById("simulation-details");
                   details?.setAttribute("open", "");
                   details?.querySelector("summary")?.focus();
                   details?.scrollIntoView({
@@ -517,7 +566,7 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               </button>
             </div>
           </div>
-          <dl className="monitor-health my-3 grid grid-cols-2 gap-3 rounded border border-slate-700 p-3 text-xs lg:grid-cols-4">
+          <dl className="monitor-health my-2 grid grid-cols-2 gap-3 rounded border border-slate-700 px-3 py-1 text-xs lg:grid-cols-4">
             <div>
               <dt className="text-sm text-slate-400">Last saved status</dt>
               <dd role="status" className="mt-2 font-mono text-emerald-300">
@@ -544,6 +593,11 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               <dd className="mt-2 font-mono text-sm">{stream}</dd>
             </div>
           </dl>
+          <PipelineHealth
+            recording={recording}
+            stream={stream}
+            receipt={telemetryReceipt}
+          />
           <p className="mb-2 text-xs text-slate-300">
             Scenario:{" "}
             {run.controls?.injection?.fixture ??
@@ -557,8 +611,42 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               : "Injection inactive"}
           </p>
 
+          {run.status === "running" && (
+            <RunControls
+              key={`controls-${run.id}`}
+              recording={recording}
+              connected={stream === "Connected"}
+              canReset={
+                run.status === "running"
+                  ? stream === "Connected"
+                  : activeRunId === null && stream === "Recorded"
+              }
+              backendUrl={backendUrl}
+              onNewRun={() => setView("setup")}
+              onSaved={(saved) => {
+                if (saved.run.id !== run.id) {
+                  setRecording(saved);
+                  selectRun(saved.run.id);
+                  setActiveRunId(saved.run.id);
+                } else
+                  setRecording((previous) =>
+                    previous?.run.id === saved.run.id &&
+                    previous.run.revision > saved.run.revision
+                      ? previous
+                      : saved,
+                  );
+              }}
+            />
+          )}
+          {run.status === "interrupted" && (
+            <p className="mb-5 text-sm text-amber-200">
+              {run.endedReason === "reset"
+                ? "Reset ended this run. Its evidence and decisions are retained."
+                : "The backend stopped before this run finished. These are its saved events."}
+            </p>
+          )}
           <RecordedPlayback
-            key={`inspection-${run.id}`}
+            key={`inspection-${run.id}-${setupAttempt}`}
             recording={recording}
             connected={stream === "Connected"}
             backendUrl={backendUrl}
@@ -578,25 +666,17 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
             <summary className="min-h-8 cursor-pointer text-sm">
               Simulation controls and recording details
             </summary>
-            {run.status === "running" && (
+            {run.status !== "running" && (
               <RunControls
-                key={`controls-${run.id}`}
                 recording={recording}
-                connected={stream === "Connected"}
-                canReset={stream === "Connected"}
+                connected={false}
+                canReset={activeRunId === null && stream === "Recorded"}
                 backendUrl={backendUrl}
+                onNewRun={() => setView("setup")}
                 onSaved={(saved) => {
-                  if (saved.run.id !== run.id) {
-                    setRecording(saved);
-                    selectRun(saved.run.id);
-                    setActiveRunId(saved.run.id);
-                  } else
-                    setRecording((previous) =>
-                      previous?.run.id === saved.run.id &&
-                      previous.run.revision > saved.run.revision
-                        ? previous
-                        : saved,
-                    );
+                  setRecording(saved);
+                  selectRun(saved.run.id);
+                  setActiveRunId(saved.run.id);
                 }}
               />
             )}
@@ -616,13 +696,6 @@ export function RunConsole({ backendUrl }: { backendUrl: string }) {
               <p className="mb-5 text-sm text-amber-200">
                 Live updates disconnected. Reconnecting automatically; controls
                 return after the saved state is synchronized.
-              </p>
-            )}
-            {run.status === "interrupted" && (
-              <p className="mb-5 text-sm text-amber-200">
-                {run.endedReason === "reset"
-                  ? "Reset ended this run. Its evidence and decisions are retained."
-                  : "The backend stopped before this run finished. These are its saved events."}
               </p>
             )}
             <details className="mb-6 rounded border border-slate-600 p-4">

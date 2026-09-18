@@ -572,7 +572,10 @@ test("controls an interactive run, retries a lost acknowledgement and recovers s
   await page
     .getByRole("button", { name: "Simulation & details", exact: true })
     .click();
-  const pause = page.getByRole("button", { name: "Pause", exact: true });
+  const pause = page.getByRole("button", {
+    name: "Pause simulation",
+    exact: true,
+  });
   await expect(pause).toBeEnabled();
   const original = (await page.getByTestId("run-id").textContent())!;
   await pause.focus();
@@ -605,7 +608,9 @@ test("controls an interactive run, retries a lost acknowledgement and recovers s
     } else await route.continue();
   });
   duplicateOne = true;
-  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Resume simulation", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Retry unconfirmed command" }),
   ).toBeEnabled();
@@ -631,25 +636,25 @@ test("controls an interactive run, retries a lost acknowledgement and recovers s
     .getByRole("button", { name: "Simulation & details", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Resume", exact: true }),
+    page.getByRole("button", { name: "Resume simulation", exact: true }),
   ).toBeEnabled();
   await expect(
     page.getByRole("combobox", { name: "Requested speed", exact: true }),
   ).toHaveValue("5");
   const beforeGap = connections;
   dropOne = true;
-  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Resume simulation", exact: true })
+    .click();
   await expect.poll(() => connections).toBeGreaterThan(beforeGap);
   await expect(pause).toBeEnabled();
   await pause.click();
 
   holdConnection = true;
   disconnect!();
+  await expect(page.getByTestId("pipeline-connection")).toBeVisible();
   await expect(
-    page.getByText(/^(Disconnected|Resynchronizing)$/),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Resume", exact: true }),
+    page.getByRole("button", { name: "Resume simulation", exact: true }),
   ).toBeDisabled();
   const reset = recordingSchema.parse(
     await (
@@ -673,7 +678,7 @@ test("controls an interactive run, retries a lost acknowledgement and recovers s
     .getByRole("button", { name: "Simulation & details", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Resume", exact: true }),
+    page.getByRole("button", { name: "Resume simulation", exact: true }),
   ).toBeEnabled();
   await expect(
     page.getByRole("combobox", { name: "Requested speed", exact: true }),

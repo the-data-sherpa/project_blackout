@@ -6,6 +6,7 @@ import {
   type InferenceAttempt,
   type Recording,
 } from "@blackout/contracts";
+import { restoreInspection } from "./inspection-link";
 import { PlaybackIndex } from "./playback";
 import { RunInspection } from "./run-inspection";
 
@@ -123,7 +124,17 @@ export function RecordedPlayback({
 }) {
   const index = useMemo(() => new PlaybackIndex(recording), [recording]);
   const live = recording.run.status === "running";
-  const [positionMs, setCursorMs] = useState(live ? Infinity : 0);
+  const [positionMs, setCursorMs] = useState(() => {
+    if (typeof window !== "undefined") {
+      const restored = restoreInspection(
+        new URL(window.location.href),
+        recording,
+      );
+      if (restored.inspection)
+        return restored.inspection.recording.run.simulationTimeMs;
+    }
+    return live ? Infinity : 0;
+  });
   const cursorMs = Math.min(index.endMs, positionMs);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<(typeof speeds)[number]>(1);
@@ -243,6 +254,9 @@ export function RecordedPlayback({
         }
         backendUrl={backendUrl}
         onSaved={onSaved}
+        onFollow={() => {
+          if (live) setCursorMs(Infinity);
+        }}
       />
     </div>
   );

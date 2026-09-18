@@ -177,20 +177,40 @@ export type Inspection = {
 export function inspectAssessment(
   source: Recording,
   id: string,
+  phase?: "pending" | "received" | "applied" | null,
 ): Inspection | null {
-  const assessment = source.attempts.find((attempt) => attempt.id === id);
-  if (!assessment) return null;
+  const saved = source.attempts.find((attempt) => attempt.id === id);
+  if (!saved) return null;
+  const assessment: InferenceAttempt =
+    phase === "pending"
+      ? {
+          ...saved,
+          status: "pending",
+          completedAt: null,
+          latencyMs: null,
+          response: null,
+          responseBody: null,
+          error: null,
+          policy: null,
+          appliedAt: null,
+          appliedSimulationTimeMs: null,
+        }
+      : phase === "received"
+        ? { ...saved, appliedAt: null, appliedSimulationTimeMs: null }
+        : saved;
   const at = assessment.simulationTimeMs;
   const wall =
     assessment.appliedAt ?? assessment.completedAt ?? assessment.startedAt;
   const projection = new PlaybackIndex(source).at(at);
-  const attempts = projection.attempts.filter((attempt) => {
-    // Legacy results became visible at their checkpoint. Modern results must
-    // have actually entered the display by the selected assessment's boundary.
-    if (attempt.appliedAt === undefined) return true;
-    if (attempt.status === "pending") return attempt.startedAt <= wall;
-    return attempt.appliedAt !== null && attempt.appliedAt <= wall;
-  });
+  const attempts = projection.attempts
+    .map((attempt) => (attempt.id === id ? assessment : attempt))
+    .filter((attempt) => {
+      // Legacy results became visible at their checkpoint. Modern results must
+      // have actually entered the display by the selected assessment's boundary.
+      if (attempt.appliedAt === undefined) return true;
+      if (attempt.status === "pending") return attempt.startedAt <= wall;
+      return attempt.appliedAt !== null && attempt.appliedAt <= wall;
+    });
   const appliedIds = new Set(
     attempts
       .filter((attempt) => attempt.appliedAt !== null)

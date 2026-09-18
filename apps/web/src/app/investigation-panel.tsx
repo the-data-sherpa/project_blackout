@@ -108,8 +108,8 @@ export function InvestigationPanel({
         </p>
       </div>
       <p className="text-xs text-slate-400">
-        Latest recorded investigation status. Selecting a historical decision
-        changes evidence inspection only.
+        Investigation status at the inspected cursor. One history belongs to
+        this run.
       </p>
       <p className="text-sm text-slate-300">
         Investigation status is separate from Jev’s activity risk. Stopping

@@ -283,3 +283,78 @@ summary:focus-visible,
 .monitor-environment .topology-assessment button {
   margin-top: 0;
 }
+
+.processing-step[aria-pressed="true"],
+.judgment-heading[aria-pressed="true"] {
+  outline: 1px solid #67e8f9;
+  outline-offset: 1px;
+}
+.processing-nodes {
+  max-height: 210px;
+  overflow: auto;
+}
+.processing-step {
+  padding: 4px 8px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 767px) {
+  .processing-nodes {
+    max-height: none;
+  }
+  .processing-step {
+    min-height: 44px;
+  }
+}
+
+.processing-toggle {
+  display: block;
+}
+.processing-steps[data-expanded="false"] {
+  display: none;
+}
+.processing-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px 16px;
+}
+.judgment-distribution {
+  line-height: 12px;
+}
+@media (min-width: 768px) {
+  .playback-toolbar {
+    padding-top: 6px;
+    padding-bottom: 6px;
+    row-gap: 2px;
+  }
+  .processing-overview .monitor-panel-heading {
+    padding-top: 0;
+    padding-bottom: 0;
+    align-items: center;
+  }
+  .processing-overview .monitor-panel-heading p {
+    margin: 0;
+  }
+}
+@media (max-width: 767px) {
+  .processing-summary {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .pipeline-health > p {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .pipeline-health dt {
+    display: inline;
+    margin-right: 6px;
+  }
+  .pipeline-health dd {
+    display: inline;
+  }
+}
