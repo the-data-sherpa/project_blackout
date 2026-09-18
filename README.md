@@ -75,6 +75,12 @@ npm ci
 npm run dev
 ```
 
+To stop the local frontend, backend and watchers from another terminal on Linux:
+
+```bash
+npm run dev:stop
+```
+
 Open [localhost:3000](http://localhost:3000). The page checks the backend, SQLite,
 and WebSocket connection. Use `localhost` to match the configured browser origin.
 `npm run dev` watches the web app, backend, and shared contracts.

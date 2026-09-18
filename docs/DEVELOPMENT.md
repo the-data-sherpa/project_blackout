@@ -73,7 +73,12 @@ failed check. These checks neither generate telemetry nor call a model. The
 separate **Start run** form begins generation.
 
 `npm run dev` stops the other processes if one exits. Ctrl+C closes the backend
-and its database. `npm run build` followed by `npm start` runs the production build.
+and its database. On Linux, `npm run dev:stop` stops this checkout's dev processes
+from another terminal, including separately started `dev:server` and `dev:web`
+scripts. It sends SIGTERM, then SIGKILL after five seconds if needed. It identifies
+processes by their checkout and npm dev script, so custom ports work and other
+projects, production servers and Docker containers are left running.
+`npm run build` followed by `npm start` runs the production build.
 Do not run development, production, and Compose simultaneously on the same ports.
 
 ## Configuration

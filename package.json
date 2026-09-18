@@ -13,6 +13,7 @@
   },
   "scripts": {
     "dev": "npm run build:contracts && concurrently --kill-others -n contracts,server,web \"npm run dev -w @blackout/contracts\" \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:stop": "node scripts/stop-dev.mjs",
     "dev:server": "dotenv -e .env -- tsx watch --include \"packages/contracts/dist/**/*.js\" apps/server/src/index.ts",
     "dev:web": "dotenv -e .env -- next dev apps/web --hostname 127.0.0.1",
     "build:contracts": "npm run build -w @blackout/contracts",

@@ -1,0 +1,538 @@
+<style>
+  #blackout-siem {
+    --bo-bg: light-dark(#f2f5f6, #0b1014);
+    --bo-panel: light-dark(#fff, #121c24);
+    --bo-ink: light-dark(#172631, #e7edf2);
+    --bo-muted: light-dark(#506271, #a6b6c3);
+    --bo-line: light-dark(#ccd6dd, #2b3b48);
+    --bo-accent: light-dark(#09674d, #71e4bd);
+    --bo-select: light-dark(#d9eee8, #193a34);
+    --bo-warn: light-dark(#8b450a, #ffbc75);
+    background: var(--bo-bg);
+    color: var(--bo-ink);
+    font:
+      14px/1.5 Arial,
+      Helvetica,
+      sans-serif;
+    border: 1px solid var(--bo-line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  #blackout-siem * {
+    box-sizing: border-box;
+  }
+  #blackout-siem button,
+  #blackout-siem input {
+    font: inherit;
+  }
+  #blackout-siem button {
+    cursor: pointer;
+    color: var(--bo-ink);
+    background: var(--bo-panel);
+    border: 1px solid var(--bo-line);
+    border-radius: 4px;
+    padding: 7px 12px;
+  }
+  #blackout-siem button:hover {
+    border-color: var(--bo-accent);
+  }
+  #blackout-siem header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--bo-line);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    background: var(--bo-panel);
+  }
+  #blackout-siem .bo-brand {
+    font: 500 16px monospace;
+    letter-spacing: 3px;
+  }
+  #blackout-siem .bo-brand span {
+    color: var(--bo-accent);
+  }
+  #blackout-siem .bo-muted {
+    color: var(--bo-muted);
+    font-size: 12px;
+  }
+  #blackout-siem .bo-shell {
+    display: grid;
+    grid-template-columns: 156px minmax(0, 1fr);
+  }
+  #blackout-siem nav {
+    padding: 16px 10px;
+    border-right: 1px solid var(--bo-line);
+    background: var(--bo-panel);
+  }
+  #blackout-siem nav button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    margin-bottom: 6px;
+  }
+  #blackout-siem nav button[aria-pressed="true"] {
+    background: var(--bo-select);
+    color: var(--bo-accent);
+    box-shadow: inset 3px 0 var(--bo-accent);
+  }
+  #blackout-siem main {
+    padding: 20px;
+    min-width: 0;
+  }
+  #blackout-siem h2 {
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0 0 3px;
+  }
+  #blackout-siem h3 {
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0 0 12px;
+  }
+  #blackout-siem .bo-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 20px 0;
+  }
+  #blackout-siem .bo-panel {
+    background: var(--bo-panel);
+    border: 1px solid var(--bo-line);
+    border-radius: 5px;
+    padding: 16px;
+    min-width: 0;
+  }
+  #blackout-siem .bo-value {
+    font-size: 28px;
+    font-weight: 500;
+    display: block;
+    font-variant-numeric: tabular-nums;
+    margin: 6px 0;
+  }
+  #blackout-siem .bo-split {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  #blackout-siem .bo-bars {
+    display: flex;
+    gap: 12px;
+    align-items: end;
+    height: 155px;
+    padding-top: 10px;
+  }
+  #blackout-siem .bo-bar {
+    flex: 1;
+    text-align: center;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--bo-muted);
+  }
+  #blackout-siem .bo-mark {
+    background: var(--bo-accent);
+    width: 100%;
+    margin: 4px 0 6px;
+    opacity: 0.8;
+  }
+  #blackout-siem .bo-warning {
+    color: var(--bo-warn);
+  }
+  #blackout-siem .bo-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  #blackout-siem .bo-status {
+    font-size: 12px;
+    color: var(--bo-warn);
+    border: 1px solid var(--bo-line);
+    padding: 2px 7px;
+    border-radius: 3px;
+  }
+  #blackout-siem .bo-table-wrap {
+    overflow-x: auto;
+  }
+  #blackout-siem table {
+    border-collapse: collapse;
+    width: 100%;
+    text-align: left;
+    font-size: 13px;
+  }
+  #blackout-siem th {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--bo-muted);
+  }
+  #blackout-siem td,
+  #blackout-siem th {
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--bo-line);
+  }
+  #blackout-siem td:first-child {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  #blackout-siem input {
+    width: 100%;
+    background: var(--bo-bg);
+    color: var(--bo-ink);
+    border: 1px solid var(--bo-line);
+    padding: 9px 12px;
+    border-radius: 4px;
+    margin: 5px 0 12px;
+  }
+  #blackout-siem .bo-detail {
+    margin-top: 12px;
+    padding: 16px;
+    background: var(--bo-select);
+    border-radius: 4px;
+  }
+  #blackout-siem .bo-detail p {
+    margin: 5px 0;
+  }
+  #blackout-siem [hidden] {
+    display: none !important;
+  }
+  #blackout-siem footer {
+    border-top: 1px solid var(--bo-line);
+    padding: 10px 20px;
+    color: var(--bo-muted);
+    font-size: 12px;
+  }
+  #blackout-siem dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px 20px;
+  }
+  #blackout-siem dd {
+    margin: 0;
+  }
+  #blackout-siem details {
+    margin-top: 14px;
+    color: var(--bo-muted);
+  }
+  #blackout-siem summary {
+    cursor: pointer;
+  }
+  @media (max-width: 700px) {
+    #blackout-siem .bo-shell {
+      grid-template-columns: 1fr;
+    }
+    #blackout-siem nav {
+      display: flex;
+      flex-wrap: wrap;
+      border-right: 0;
+      border-bottom: 1px solid var(--bo-line);
+      gap: 5px;
+    }
+    #blackout-siem nav button {
+      width: auto;
+      margin: 0;
+    }
+    #blackout-siem .bo-split {
+      grid-template-columns: 1fr;
+    }
+    #blackout-siem main {
+      padding: 14px;
+    }
+    #blackout-siem .bo-stats {
+      gap: 7px;
+    }
+    #blackout-siem .bo-stats .bo-panel {
+      padding: 10px;
+    }
+    #blackout-siem .bo-value {
+      font-size: 23px;
+    }
+  }
+  @media (max-width: 400px) {
+    #blackout-siem .bo-stats {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (pointer: coarse) {
+    #blackout-siem button,
+    #blackout-siem summary {
+      min-height: 44px;
+    }
+  }
+</style>
+<div id="blackout-siem" aria-label="BLACKOUT dashboard concept">
+  <header>
+    <div class="bo-brand">BLACKOUT<span>_</span></div>
+    <div class="bo-muted">Design concept · Illustrative data</div>
+  </header>
+  <div class="bo-shell">
+    <nav aria-label="Security views">
+      <button type="button" data-view="overview" aria-pressed="true">
+        Overview</button
+      ><button type="button" data-view="investigation" aria-pressed="false">
+        Investigation</button
+      ><button type="button" data-view="events" aria-pressed="false">
+        Event explorer
+      </button>
+    </nav>
+    <main>
+      <div class="bo-row">
+        <div>
+          <h2 id="bo-title">Security overview</h2>
+          <div class="bo-muted">Demo recording · Replay paused at 00:30</div>
+        </div>
+        <span class="bo-muted">Window: 00:00–00:30</span>
+      </div>
+      <section data-panel="overview">
+        <div class="bo-stats">
+          <div class="bo-panel">
+            <span>Open investigation</span><span class="bo-value">1</span
+            ><span class="bo-muted">Awaiting acknowledgement</span>
+          </div>
+          <div class="bo-panel">
+            <span>Jev compromise probability</span
+            ><span class="bo-value">91%</span
+            ><span class="bo-muted">Global assessment · Snapshot 00:30</span>
+          </div>
+          <div class="bo-panel">
+            <span>Suspicious entities</span><span class="bo-value">3</span
+            ><span class="bo-muted">Evidence rule · Last 30 seconds</span>
+          </div>
+        </div>
+        <div class="bo-split">
+          <div class="bo-panel">
+            <h3>Jev assessment over time</h3>
+            <div class="bo-muted">
+              Compromise probability · Recorded checkpoints
+            </div>
+            <div
+              class="bo-bars"
+              role="img"
+              aria-label="Illustrative probability at 0, 5, 10, 15, 20, 25 and 30 seconds: 4, 6, 22, 57, 84, 89 and 91 percent."
+            >
+              <div class="bo-bar">
+                4%
+                <div class="bo-mark" style="height: 4px"></div>
+                0s
+              </div>
+              <div class="bo-bar">
+                6%
+                <div class="bo-mark" style="height: 6px"></div>
+                5s
+              </div>
+              <div class="bo-bar">
+                22%
+                <div class="bo-mark" style="height: 22px"></div>
+                10s
+              </div>
+              <div class="bo-bar">
+                57%
+                <div class="bo-mark" style="height: 57px"></div>
+                15s
+              </div>
+              <div class="bo-bar">
+                84%
+                <div class="bo-mark" style="height: 84px"></div>
+                20s
+              </div>
+              <div class="bo-bar">
+                89%
+                <div class="bo-mark" style="height: 89px"></div>
+                25s
+              </div>
+              <div class="bo-bar">
+                91%
+                <div class="bo-mark" style="height: 91px"></div>
+                30s
+              </div>
+            </div>
+          </div>
+          <div class="bo-panel">
+            <div class="bo-row">
+              <h3>Current investigation</h3>
+              <span class="bo-status">Open</span>
+            </div>
+            <p>Incident advisory</p>
+            <p class="bo-muted">
+              Opened at 00:20 · Severity 2 / 3<br />Triggered by an applied Jev
+              decision.
+            </p>
+            <button type="button" data-view="investigation">
+              Inspect evidence →
+            </button>
+          </div>
+        </div>
+      </section>
+      <section
+        data-panel="investigation"
+        hidden
+        class="bo-panel"
+        style="margin-top: 20px"
+      >
+        <div class="bo-row">
+          <h3>Incident advisory</h3>
+          <span class="bo-status">Open</span>
+        </div>
+        <dl>
+          <dt>Opened</dt>
+          <dd>00:20 simulation time</dd>
+          <dt>Trigger</dt>
+          <dd>Compromise probability 84% · Severity 2 / 3</dd>
+          <dt>Classification</dt>
+          <dd>Compromise · Confidence 82%</dd>
+          <dt>Policy</dt>
+          <dd>All incident conditions matched</dd>
+          <dt>Evidence boundary</dt>
+          <dd>Observations through 00:20</dd>
+        </dl>
+        <button type="button" id="bo-evidence-button">
+          Show triggering evidence
+        </button>
+        <div class="bo-detail" id="bo-trigger" hidden>
+          <h3>Evidence at the triggering decision</h3>
+          <p>00:17 · alex.chen · Authentication failure on ws-07</p>
+          <p>
+            00:19 · alex.chen · Successful authentication from an unfamiliar
+            device
+          </p>
+          <p class="bo-muted">
+            Later events do not appear in this decision’s evidence.
+          </p>
+        </div>
+        <p class="bo-muted">
+          Advisory only · Closing an investigation does not remediate entities.
+        </p>
+      </section>
+      <section id="bo-events-panel" class="bo-panel">
+        <div class="bo-row">
+          <h3>Recent observable events</h3>
+          <span class="bo-muted" id="bo-event-count">4 example events</span>
+        </div>
+        <label for="bo-search" class="bo-muted"
+          >Search these example events</label
+        ><input
+          id="bo-search"
+          type="search"
+          placeholder="User, host, event type…"
+        />
+        <div class="bo-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Time</th>
+                <th scope="col">Type</th>
+                <th scope="col">Entity</th>
+                <th scope="col">Observation</th>
+              </tr>
+            </thead>
+            <tbody id="bo-event-rows">
+              <tr>
+                <td>00:29</td>
+                <td>Network</td>
+                <td>ws-07</td>
+                <td>Connection to files-01</td>
+              </tr>
+              <tr>
+                <td>00:26</td>
+                <td>DNS</td>
+                <td>ws-07</td>
+                <td>Query for files.internal</td>
+              </tr>
+              <tr>
+                <td>00:19</td>
+                <td>Authentication</td>
+                <td>alex.chen</td>
+                <td>Success · Unfamiliar device</td>
+              </tr>
+              <tr>
+                <td>00:17</td>
+                <td>Authentication</td>
+                <td>alex.chen</td>
+                <td>Failure · ws-07</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p id="bo-no-events" class="bo-muted" hidden>
+          No matching example events.
+        </p>
+      </section>
+      <details>
+        <summary>Simulation &amp; recording tools</summary>
+        <p class="bo-muted">
+          Proposed location for run setup, scenario controls, saved recordings
+          and model evaluation reports.
+        </p>
+      </details>
+    </main>
+  </div>
+  <footer>
+    Synthetic telemetry · Entity evidence is separate from global Jev judgment
+  </footer>
+</div>
+<script>
+  (() => {
+    const root = document.getElementById("blackout-siem");
+    const titles = {
+      overview: "Security overview",
+      investigation: "Investigation",
+      events: "Event explorer",
+    };
+    function switchView(view) {
+      root.querySelector("#bo-title").textContent = titles[view];
+      root.querySelectorAll("[data-panel]").forEach((el) => {
+        el.hidden = el.dataset.panel !== view;
+      });
+      root.querySelector("#bo-events-panel").hidden = view === "investigation";
+      root
+        .querySelectorAll("nav [data-view]")
+        .forEach((el) =>
+          el.setAttribute("aria-pressed", String(el.dataset.view === view)),
+        );
+    }
+    root
+      .querySelectorAll("[data-view]")
+      .forEach((el) =>
+        el.addEventListener("click", () => switchView(el.dataset.view)),
+      );
+    const input = root.querySelector("#bo-search");
+    input.addEventListener("input", () => {
+      const query = input.value.trim().toLowerCase();
+      let count = 0;
+      root.querySelectorAll("#bo-event-rows tr").forEach((row) => {
+        row.hidden = !row.textContent.toLowerCase().includes(query);
+        if (!row.hidden) count++;
+      });
+      root.querySelector("#bo-event-count").textContent =
+        count + " example event" + (count === 1 ? "" : "s");
+      root.querySelector("#bo-no-events").hidden = count !== 0;
+    });
+    const evidenceButton = root.querySelector("#bo-evidence-button");
+    evidenceButton.addEventListener("click", () => {
+      const panel = root.querySelector("#bo-trigger");
+      panel.hidden = !panel.hidden;
+      evidenceButton.textContent = panel.hidden
+        ? "Show triggering evidence"
+        : "Hide triggering evidence";
+      evidenceButton.setAttribute("aria-expanded", String(!panel.hidden));
+    });
+    evidenceButton.setAttribute("aria-expanded", "false");
+    evidenceButton.setAttribute("aria-controls", "bo-trigger");
+    root.querySelector("#bo-event-count").setAttribute("aria-live", "polite");
+    const appearance = { density: "comfortable" };
+    function render() {
+      root.querySelector("main").style.padding =
+        appearance.density === "compact" ? "12px" : "20px";
+    }
+    if (globalThis.Tweak) {
+      const tweaks = new Tweak({ container: root, onChange: render });
+      tweaks.addSelect(appearance, "density", {
+        label: "Information density",
+        options: ["comfortable", "compact"],
+      });
+    }
+  })();
+</script>

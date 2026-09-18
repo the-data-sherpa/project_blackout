@@ -1,0 +1,2607 @@
+<!-- Throwaway design mock: validate the agreed three-zone console and synchronized inspection. All responses and telemetry are illustrative; no network or model calls. -->
+<style>
+  #blackout-monitor {
+    color-scheme: dark;
+    --bm-bg: #080f16;
+    --bm-surface: #0e1923;
+    --bm-raised: #152330;
+    --bm-line: #263a48;
+    --bm-text: #dee8ef;
+    --bm-muted: #95adbe;
+    --bm-green: #76ddb1;
+    --bm-amber: #efbf7e;
+    --bm-red: #ff9392;
+    --bm-blue: #95bdf6;
+    background: var(--bm-bg);
+    color: var(--bm-text);
+    font:
+      13px/1.45 "Segoe UI",
+      Arial,
+      sans-serif;
+    border: 1px solid var(--bm-line);
+    border-radius: 8px;
+    overflow: hidden;
+    container-type: inline-size;
+    position: relative;
+  }
+  #blackout-monitor * {
+    box-sizing: border-box;
+  }
+  #blackout-monitor [hidden] {
+    display: none !important;
+  }
+  #blackout-monitor button,
+  #blackout-monitor input,
+  #blackout-monitor select {
+    font: inherit;
+    color: inherit;
+  }
+  #blackout-monitor button {
+    border: 1px solid var(--bm-line);
+    background: var(--bm-surface);
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  #blackout-monitor button:hover {
+    background: var(--bm-raised);
+    border-color: var(--bm-muted);
+  }
+  #blackout-monitor button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  #blackout-monitor button:focus-visible,
+  #blackout-monitor input:focus-visible,
+  #blackout-monitor select:focus-visible,
+  #blackout-monitor summary:focus-visible {
+    outline: 2px solid var(--bm-green);
+    outline-offset: 3px;
+  }
+  #blackout-monitor .bm-icon {
+    width: 15px;
+    height: 15px;
+    flex: none;
+  }
+  #blackout-monitor .bm-mono {
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  #blackout-monitor .bm-muted {
+    color: var(--bm-muted);
+  }
+  #blackout-monitor .bm-small {
+    font-size: 11px;
+  }
+  #blackout-monitor .bm-good {
+    color: var(--bm-green);
+  }
+  #blackout-monitor .bm-warn {
+    color: var(--bm-amber);
+  }
+  #blackout-monitor .bm-danger {
+    color: var(--bm-red);
+  }
+  #blackout-monitor .bm-label {
+    font-size: 11px;
+    letter-spacing: 1.4px;
+    color: var(--bm-muted);
+    text-transform: uppercase;
+  }
+  #blackout-monitor .bm-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    margin-right: 5px;
+  }
+  #blackout-monitor .bm-chip {
+    border: 1px solid var(--bm-line);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 11px;
+    letter-spacing: 0.45px;
+    white-space: nowrap;
+  }
+  #blackout-monitor .bm-primary {
+    background: #173d32;
+    border-color: #397e64;
+    color: var(--bm-green);
+  }
+  #blackout-monitor .bm-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  #blackout-monitor .bm-flex {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  #blackout-monitor .bm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 14px 18px;
+    background: #0b151e;
+    border-bottom: 1px solid var(--bm-line);
+    flex-wrap: wrap;
+  }
+  #blackout-monitor .bm-brand {
+    font:
+      500 17px "SFMono-Regular",
+      Consolas,
+      monospace;
+    letter-spacing: 3px;
+  }
+  #blackout-monitor .bm-brand span {
+    color: var(--bm-green);
+  }
+  #blackout-monitor .bm-header nav {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  #blackout-monitor .bm-header nav button {
+    border: 0;
+    background: transparent;
+    color: var(--bm-muted);
+    padding: 5px 9px;
+    font-size: 12px;
+  }
+  #blackout-monitor .bm-header nav button[aria-pressed="true"] {
+    background: var(--bm-raised);
+    color: var(--bm-text);
+  }
+  #blackout-monitor .bm-preview-label {
+    color: var(--bm-amber);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  #blackout-monitor .bm-toolbar {
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--bm-line);
+  }
+  #blackout-monitor .bm-toolbar select {
+    background: var(--bm-surface);
+    border: 1px solid var(--bm-line);
+    border-radius: 4px;
+    padding: 5px;
+    max-width: 100%;
+  }
+  #blackout-monitor .bm-session {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  #blackout-monitor .bm-toolbar button {
+    font-size: 12px;
+  }
+  #blackout-monitor .bm-health {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 7px 16px;
+    color: var(--bm-muted);
+    font-size: 11px;
+    border-bottom: 1px solid var(--bm-line);
+  }
+  #blackout-monitor .bm-health-group {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+  }
+  #blackout-monitor .bm-pin {
+    background: #2b251a;
+    border-bottom: 1px solid #5f4a29;
+    padding: 8px 16px;
+    color: var(--bm-amber);
+    font-size: 12px;
+  }
+  #blackout-monitor .bm-drawer {
+    padding: 14px 16px;
+    background: var(--bm-raised);
+    border-bottom: 1px solid var(--bm-line);
+  }
+  #blackout-monitor .bm-drawer p {
+    margin: 8px 0 0;
+  }
+  #blackout-monitor .bm-drawer select {
+    background: var(--bm-bg);
+    border: 1px solid var(--bm-line);
+    padding: 7px;
+    max-width: 100%;
+  }
+  #blackout-monitor .bm-workspace {
+    padding: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+    gap: 12px;
+  }
+  #blackout-monitor .bm-panel {
+    min-width: 0;
+    background: var(--bm-surface);
+    border: 1px solid var(--bm-line);
+    border-radius: 5px;
+  }
+  #blackout-monitor .bm-panel-head {
+    padding: 11px 13px;
+    border-bottom: 1px solid var(--bm-line);
+  }
+  #blackout-monitor h2,
+  #blackout-monitor h3 {
+    font-size: 13px;
+    font-weight: 500;
+    margin: 0;
+  }
+  #blackout-monitor .bm-panel-head h2 {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  #blackout-monitor .bm-head-sub {
+    font-size: 11px;
+    color: var(--bm-muted);
+    margin-top: 3px;
+  }
+  #blackout-monitor .bm-environment {
+    display: flex;
+    flex-direction: column;
+  }
+  #blackout-monitor .bm-map {
+    position: relative;
+    padding: 18px 15px 10px;
+    background-image: radial-gradient(#234034 0.7px, transparent 0.7px);
+    background-size: 18px 18px;
+    min-height: 240px;
+  }
+  #blackout-monitor .bm-map-cols {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 38px;
+    position: relative;
+    z-index: 1;
+  }
+  #blackout-monitor .bm-map-col {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+    min-width: 0;
+  }
+  #blackout-monitor .bm-map-col > .bm-label {
+    margin: 0 0 3px 3px;
+    font-size: 11px;
+  }
+  #blackout-monitor .bm-node {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    gap: 3px;
+    padding: 9px 9px;
+    width: 100%;
+    border-radius: 5px;
+    min-height: 55px;
+    box-shadow: 0 0 0 4px var(--bm-surface);
+    background: var(--bm-surface);
+    text-align: left;
+    position: relative;
+  }
+  #blackout-monitor .bm-node-name {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    font:
+      12px Consolas,
+      monospace;
+    white-space: nowrap;
+  }
+  #blackout-monitor .bm-node .bm-node-status {
+    font-size: 11px;
+    color: var(--bm-muted);
+  }
+  #blackout-monitor .bm-node[data-suspicious="true"] {
+    background: #28231b;
+    border-color: #94703d;
+  }
+  #blackout-monitor .bm-node[data-suspicious="true"] .bm-node-status {
+    color: var(--bm-amber);
+  }
+  #blackout-monitor .bm-node[aria-pressed="true"] {
+    outline: 2px solid var(--bm-green);
+    outline-offset: 2px;
+  }
+  #blackout-monitor .bm-edges {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  #blackout-monitor .bm-edge {
+    fill: none;
+    stroke: #355b4c;
+    stroke-width: 1.4;
+  }
+  #blackout-monitor .bm-edge[data-active="true"] {
+    stroke: #c39556;
+    stroke-width: 1.6;
+  }
+  #blackout-monitor .bm-map-legend {
+    padding: 0 13px 9px;
+    font-size: 11px;
+    color: var(--bm-muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  #blackout-monitor .bm-entity-summary {
+    padding: 8px 12px;
+    background: #101f2a;
+    border-top: 1px solid var(--bm-line);
+    font-size: 11px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  #blackout-monitor .bm-entity-summary button {
+    font-size: 11px;
+    padding: 3px 7px;
+  }
+  #blackout-monitor .bm-event-feed {
+    border-top: 1px solid var(--bm-line);
+    margin-top: auto;
+  }
+  #blackout-monitor .bm-event-head {
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  #blackout-monitor .bm-event-head button {
+    font-size: 11px;
+    padding: 3px 7px;
+  }
+  #blackout-monitor .bm-events {
+    padding: 0 12px 8px;
+  }
+  #blackout-monitor .bm-event {
+    display: grid;
+    grid-template-columns: 40px 71px minmax(0, 1fr);
+    gap: 7px;
+    width: 100%;
+    min-height: 24px;
+    padding: 4px 0;
+    border: 0;
+    border-radius: 0;
+    border-bottom: 1px solid #1c2c38;
+    background: transparent;
+    text-align: left;
+    font-size: 11px;
+    justify-content: start;
+  }
+  #blackout-monitor .bm-event:hover {
+    background: var(--bm-raised);
+  }
+  #blackout-monitor .bm-event span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #blackout-monitor .bm-event-time {
+    color: var(--bm-muted);
+    font-family: Consolas, monospace;
+  }
+  #blackout-monitor .bm-family {
+    color: var(--bm-blue);
+  }
+  #blackout-monitor .bm-rail-head {
+    padding: 11px 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--bm-line);
+  }
+  #blackout-monitor .bm-rail {
+    display: flex;
+    flex-direction: column;
+  }
+  #blackout-monitor .bm-judgments {
+    padding: 0 12px 7px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex: 1;
+  }
+  #blackout-monitor .bm-judgment {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--bm-line);
+  }
+  #blackout-monitor .bm-judgment:last-child {
+    border: 0;
+  }
+  #blackout-monitor .bm-q-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  #blackout-monitor .bm-q-title button {
+    min-height: 20px;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    text-align: left;
+    justify-content: start;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  #blackout-monitor .bm-q-title button:hover {
+    color: var(--bm-green);
+  }
+  #blackout-monitor .bm-q-type {
+    font:
+      11px Consolas,
+      monospace;
+    color: var(--bm-muted);
+  }
+  #blackout-monitor .bm-prob {
+    font:
+      500 25px/1.2 Consolas,
+      monospace;
+    letter-spacing: -1px;
+    color: var(--bm-text);
+  }
+  #blackout-monitor .bm-prob-sub {
+    font-size: 11px;
+    color: var(--bm-muted);
+  }
+  #blackout-monitor .bm-track {
+    height: 5px;
+    background: #23303c;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #blackout-monitor .bm-fill {
+    height: 100%;
+    background: var(--bm-green);
+    transition: width 0.3s ease;
+  }
+  #blackout-monitor .bm-prob-track {
+    margin-top: 7px;
+  }
+  #blackout-monitor .bm-dist {
+    display: grid;
+    grid-template-columns: 91px minmax(0, 1fr) 33px;
+    gap: 8px;
+    align-items: center;
+    font:
+      11px/1.3 Consolas,
+      monospace;
+    padding: 1px 0;
+  }
+  #blackout-monitor .bm-dist .bm-dist-label {
+    color: var(--bm-muted);
+  }
+  #blackout-monitor .bm-dist[data-selected="true"] .bm-dist-label {
+    color: var(--bm-text);
+  }
+  #blackout-monitor .bm-dist .bm-fill {
+    background: #49695e;
+  }
+  #blackout-monitor .bm-dist[data-selected="true"] .bm-fill {
+    background: var(--bm-green);
+  }
+  #blackout-monitor .bm-dist .bm-number {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  #blackout-monitor .bm-q-footer {
+    font-size: 11px;
+    color: var(--bm-muted);
+    margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  #blackout-monitor .bm-levels {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 7px;
+  }
+  #blackout-monitor .bm-level {
+    background: #111f2a;
+    padding: 5px 6px;
+    font-size: 11px;
+    min-width: 0;
+  }
+  #blackout-monitor .bm-level strong {
+    font-weight: 500;
+    display: inline;
+    font:
+      11px Consolas,
+      monospace;
+    margin-left: 4px;
+  }
+  #blackout-monitor .bm-level .bm-track {
+    margin-top: 5px;
+  }
+  .bm-level .bm-fill {
+    background: #49695e;
+  }
+  #blackout-monitor .bm-level[data-selected="true"] .bm-fill {
+    background: var(--bm-green);
+  }
+  #blackout-monitor .bm-error-strip {
+    margin: 8px 12px 0;
+    padding: 7px 8px;
+    border-left: 2px solid var(--bm-amber);
+    background: #2b251a;
+    color: var(--bm-amber);
+    font-size: 11px;
+  }
+  #blackout-monitor .bm-history {
+    padding: 0 12px 12px;
+  }
+  #blackout-monitor .bm-history-inner {
+    border: 1px solid var(--bm-line);
+    background: #0d1721;
+    border-radius: 5px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+  }
+  #blackout-monitor .bm-history-points {
+    display: flex;
+    gap: 6px;
+    flex: 1;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  #blackout-monitor .bm-history-points button {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 3px 7px;
+    min-width: 40px;
+    font:
+      11px Consolas,
+      monospace;
+    color: var(--bm-muted);
+    border-color: transparent;
+    background: transparent;
+  }
+  #blackout-monitor .bm-history-points button strong {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--bm-text);
+  }
+  #blackout-monitor .bm-history-points button[aria-pressed="true"] {
+    border-color: #397e64;
+    background: #163327;
+    color: var(--bm-green);
+  }
+  #blackout-monitor .bm-history-points button[data-failed="true"] {
+    color: var(--bm-amber);
+  }
+  #blackout-monitor .bm-flow-panel {
+    margin: 0 12px 12px;
+  }
+  #blackout-monitor .bm-flow-head {
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--bm-line);
+  }
+  #blackout-monitor .bm-flow-head button {
+    font-size: 11px;
+    padding: 3px 7px;
+  }
+  #blackout-monitor .bm-flow-map {
+    padding: 10px 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.1fr 1.15fr 1fr;
+    gap: 26px;
+    position: relative;
+    min-height: 145px;
+    align-items: center;
+  }
+  #blackout-monitor .bm-stage {
+    z-index: 1;
+    min-width: 0;
+    position: relative;
+  }
+  #blackout-monitor .bm-stage > .bm-label {
+    font-size: 11px;
+    margin-bottom: 7px;
+    white-space: nowrap;
+  }
+  #blackout-monitor .bm-flow-node {
+    width: 100%;
+    flex-direction: column;
+    align-items: start;
+    gap: 4px;
+    text-align: left;
+    background: var(--bm-surface);
+    padding: 10px;
+    box-shadow: 0 0 0 4px var(--bm-surface);
+    font-size: 11px;
+    min-height: 59px;
+  }
+  #blackout-monitor .bm-flow-node strong {
+    font-size: 12px;
+    font-weight: 500;
+  }
+  #blackout-monitor .bm-flow-node small {
+    color: var(--bm-muted);
+    font-size: 11px;
+  }
+  #blackout-monitor .bm-flow-judgments {
+    display: grid;
+    gap: 4px;
+  }
+  #blackout-monitor .bm-flow-judgments button {
+    padding: 3px 7px;
+    min-height: 0;
+    font-size: 11px;
+    line-height: 14px;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  #blackout-monitor .bm-flow-judgments button span:last-child {
+    font-family: Consolas, monospace;
+  }
+  #blackout-monitor .bm-flow-node[data-matched="true"] {
+    border-color: #94703d;
+    background: #28231b;
+  }
+  #blackout-monitor .bm-flow-map .bm-edge {
+    stroke: #3a6252;
+  }
+  #blackout-monitor .bm-flow-map .bm-edge[data-active="true"] {
+    stroke: #b58c54;
+  }
+  #blackout-monitor .bm-flow-note {
+    border-top: 1px solid var(--bm-line);
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--bm-muted);
+  }
+  #blackout-monitor .bm-detail {
+    margin: 0 12px 12px;
+    background: var(--bm-raised);
+    border: 1px solid #43604f;
+    border-radius: 5px;
+  }
+  #blackout-monitor .bm-detail-head {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--bm-line);
+  }
+  #blackout-monitor .bm-detail-content {
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    font-size: 12px;
+  }
+  #blackout-monitor .bm-detail-content p {
+    margin: 5px 0 10px;
+  }
+  #blackout-monitor .bm-detail-content ul {
+    padding-left: 18px;
+    margin: 6px 0;
+  }
+  #blackout-monitor .bm-detail pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: var(--bm-bg);
+    padding: 10px;
+    font:
+      11px/1.5 Consolas,
+      monospace;
+    border-radius: 4px;
+    margin: 6px 0;
+  }
+  #blackout-monitor .bm-detail summary {
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--bm-muted);
+    padding: 3px 0;
+  }
+  #blackout-monitor .bm-rule-row {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--bm-line);
+    padding: 5px 0;
+  }
+  #blackout-monitor .bm-explorer {
+    margin: 12px;
+  }
+  #blackout-monitor .bm-search-row {
+    padding: 12px;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 9px;
+  }
+  #blackout-monitor label {
+    font-size: 11px;
+    color: var(--bm-muted);
+    display: block;
+  }
+  #blackout-monitor .bm-search-row input,
+  #blackout-monitor .bm-search-row select {
+    display: block;
+    background: var(--bm-bg);
+    border: 1px solid var(--bm-line);
+    border-radius: 4px;
+    padding: 8px;
+    margin-top: 4px;
+    width: 100%;
+    min-width: 0;
+  }
+  #blackout-monitor .bm-table-wrap {
+    overflow-x: auto;
+    padding: 0 12px 12px;
+  }
+  #blackout-monitor table {
+    border-collapse: collapse;
+    width: 100%;
+    text-align: left;
+    font-size: 12px;
+  }
+  #blackout-monitor th {
+    color: var(--bm-muted);
+    font-size: 11px;
+    font-weight: 400;
+  }
+  #blackout-monitor td,
+  #blackout-monitor th {
+    padding: 9px 7px;
+    border-bottom: 1px solid var(--bm-line);
+  }
+  #blackout-monitor .bm-table-wrap button {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+  #blackout-monitor .bm-investigation-view {
+    margin: 12px;
+    padding: 16px;
+  }
+  #blackout-monitor .bm-investigation-view p {
+    color: var(--bm-muted);
+    font-size: 12px;
+  }
+  #blackout-monitor .bm-footer {
+    padding: 8px 14px;
+    border-top: 1px solid var(--bm-line);
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    color: var(--bm-muted);
+    font-size: 11px;
+  }
+  #blackout-monitor .bm-empty {
+    padding: 18px 12px;
+    color: var(--bm-muted);
+    font-size: 12px;
+  }
+  #blackout-monitor .bm-toast {
+    color: var(--bm-green);
+    font-size: 11px;
+    padding: 0 14px 10px;
+  }
+  #blackout-monitor .bm-mobile-flow {
+    display: none;
+  }
+  @container (max-width:760px) {
+    #blackout-monitor .bm-workspace {
+      grid-template-columns: 1fr;
+    }
+    #blackout-monitor .bm-flow-map {
+      grid-template-columns: 1fr;
+      gap: 22px;
+      padding: 16px 24px;
+    }
+    #blackout-monitor .bm-flow-node {
+      min-height: 44px;
+    }
+    #blackout-monitor .bm-flow-judgments {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    #blackout-monitor .bm-flow-judgments button {
+      min-height: 36px;
+    }
+    #blackout-monitor .bm-stage > .bm-label {
+      font-size: 11px;
+    }
+    #blackout-monitor .bm-detail-content {
+      grid-template-columns: 1fr;
+    }
+    #blackout-monitor .bm-mobile-flow {
+      display: inline-flex;
+    }
+    #blackout-monitor .bm-search-row {
+      grid-template-columns: 1fr;
+    }
+    #blackout-monitor .bm-toolbar {
+      padding: 10px 12px;
+    }
+    #blackout-monitor .bm-header {
+      padding: 12px;
+    }
+    #blackout-monitor .bm-label {
+      font-size: 11px;
+    }
+    #blackout-monitor .bm-preview-label {
+      font-size: 11px;
+    }
+    #blackout-monitor .bm-q-type,
+    #blackout-monitor .bm-dist,
+    #blackout-monitor .bm-level,
+    #blackout-monitor .bm-q-footer,
+    #blackout-monitor .bm-prob-sub,
+    #blackout-monitor .bm-node .bm-node-status,
+    #blackout-monitor .bm-map-legend,
+    #blackout-monitor .bm-footer,
+    #blackout-monitor .bm-flow-note,
+    #blackout-monitor .bm-chip {
+      font-size: 11px;
+    }
+    #blackout-monitor .bm-judgment {
+      padding: 12px 0;
+    }
+    #blackout-monitor .bm-map-cols {
+      gap: 24px;
+    }
+    #blackout-monitor .bm-node-name {
+      font-size: 11px;
+    }
+    #blackout-monitor .bm-map {
+      padding: 14px 10px 10px;
+    }
+    #blackout-monitor .bm-history-points {
+      justify-content: start;
+    }
+  }
+  @container (max-width:420px) {
+    #blackout-monitor .bm-map-cols {
+      gap: 12px;
+    }
+    #blackout-monitor .bm-node {
+      padding: 8px 5px;
+      min-height: 65px;
+    }
+    #blackout-monitor .bm-node-name {
+      flex-wrap: wrap;
+      gap: 4px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    #blackout-monitor .bm-node-status {
+      overflow-wrap: anywhere;
+    }
+    #blackout-monitor .bm-map-col > .bm-label {
+      font-size: 11px;
+      letter-spacing: 0.4px;
+    }
+    #blackout-monitor .bm-event {
+      grid-template-columns: 35px 58px minmax(0, 1fr);
+      gap: 4px;
+    }
+    #blackout-monitor .bm-workspace {
+      padding: 8px;
+      gap: 8px;
+    }
+    #blackout-monitor .bm-history {
+      padding: 0 8px 8px;
+    }
+    #blackout-monitor .bm-flow-panel {
+      margin: 0 8px 8px;
+    }
+    #blackout-monitor .bm-header nav button {
+      padding: 5px 6px;
+    }
+    #blackout-monitor .bm-health-group {
+      gap: 7px;
+    }
+    #blackout-monitor .bm-rail-head {
+      align-items: start;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #blackout-monitor .bm-fill {
+      transition: none;
+    }
+  }
+  @media (pointer: coarse) {
+    #blackout-monitor button,
+    #blackout-monitor .bm-q-title button {
+      min-height: 44px;
+    }
+    #blackout-monitor input,
+    #blackout-monitor select {
+      font-size: 16px;
+    }
+    #blackout-monitor .bm-event {
+      min-height: 44px;
+    }
+    #blackout-monitor .bm-flow-judgments button {
+      min-height: 44px;
+    }
+  }
+</style>
+<div id="blackout-monitor" aria-label="BLACKOUT monitoring dashboard prototype">
+  <header class="bm-header">
+    <div class="bm-flex">
+      <div class="bm-brand">BLACKOUT<span>_</span></div>
+      <span class="bm-label">Security operations</span>
+    </div>
+    <nav aria-label="Console views">
+      <button type="button" data-tab="monitor" aria-pressed="true">
+        Monitor</button
+      ><button type="button" data-tab="events" aria-pressed="false">
+        Events</button
+      ><button type="button" data-tab="investigation" aria-pressed="false">
+        Investigation
+      </button>
+    </nav>
+    <span class="bm-preview-label">DESIGN PREVIEW · SAMPLE DATA</span>
+  </header>
+  <div class="bm-toolbar">
+    <div class="bm-session">
+      <span class="bm-chip">SYNTHETIC</span
+      ><span class="bm-mono" id="bm-session-name">acme-lab / run-042</span
+      ><button type="button" id="bm-recordings">
+        Recordings
+        <i class="bm-icon" data-lucide="chevron-down" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="bm-flex">
+      <span id="bm-clock" class="bm-mono">00:30</span
+      ><button type="button" id="bm-play">
+        <i class="bm-icon" data-lucide="play" aria-hidden="true"></i> Play
+        preview</button
+      ><label for="bm-speed" class="bm-small">Speed</label
+      ><select id="bm-speed" aria-label="Preview speed">
+        <option value="1">1×</option>
+        <option value="2">2×</option>
+        <option value="5" selected>5×</option></select
+      ><button type="button" id="bm-controls">
+        Simulation
+        <i
+          class="bm-icon"
+          data-lucide="sliders-horizontal"
+          aria-hidden="true"
+        ></i>
+      </button>
+    </div>
+  </div>
+  <section id="bm-recording-drawer" class="bm-drawer" hidden>
+    <div class="bm-row">
+      <h2>Preview recordings</h2>
+      <button type="button" data-close="bm-recording-drawer">Close</button>
+    </div>
+    <div class="bm-flex" style="margin-top: 10px">
+      <button type="button" data-load="attack">
+        Credential compromise · run-042</button
+      ><button type="button" data-load="baseline">Baseline · run-041</button
+      ><button type="button" data-load="benign">
+        Benign maintenance · run-040
+      </button>
+    </div>
+    <p class="bm-muted bm-small">
+      Illustrative recordings for design review. Opening a recording makes no
+      model requests.
+    </p>
+  </section>
+  <section id="bm-simulation-drawer" class="bm-drawer" hidden>
+    <div class="bm-row">
+      <h2>Simulation controls — preview</h2>
+      <button type="button" data-close="bm-simulation-drawer">Close</button>
+    </div>
+    <div class="bm-flex" style="margin-top: 10px">
+      <label for="bm-scenario">Scenario</label
+      ><select id="bm-scenario">
+        <option value="attack">Credential compromise</option>
+        <option value="baseline">Baseline</option>
+        <option value="benign">Benign maintenance</option></select
+      ><button type="button" id="bm-restart">Restart preview</button
+      ><button type="button" id="bm-show-outage">
+        Preview model unavailable
+      </button>
+    </div>
+    <p class="bm-muted bm-small">
+      Preview responses are scripted examples. The finished dashboard will
+      display recorded SystemOne responses.
+    </p>
+  </section>
+  <div class="bm-health">
+    <div class="bm-health-group">
+      <span
+        ><span class="bm-dot bm-good"></span
+        ><span id="bm-run-status">Preview paused</span></span
+      ><span id="bm-telemetry-status">Telemetry through 00:30</span
+      ><span id="bm-model-status">Model response · 412 ms</span>
+    </div>
+    <span id="bm-injection-status" class="bm-warn"
+      >Injection active · credential compromise</span
+    >
+  </div>
+  <div id="bm-pin-banner" class="bm-pin bm-row" hidden aria-live="polite">
+    <span id="bm-pin-copy">Inspecting 00:20 · 2 newer assessments</span
+    ><button type="button" id="bm-follow">
+      Return to live preview
+      <i class="bm-icon" data-lucide="arrow-right" aria-hidden="true"></i>
+    </button>
+  </div>
+  <div id="bm-monitor-view">
+    <div class="bm-workspace">
+      <section class="bm-panel bm-environment">
+        <div class="bm-panel-head bm-row">
+          <div>
+            <h2>
+              <i
+                class="bm-icon bm-good"
+                data-lucide="network"
+                aria-hidden="true"
+              ></i>
+              Environment
+            </h2>
+            <div class="bm-head-sub">
+              Observed relationships · <span id="bm-map-time">00:30</span>
+            </div>
+          </div>
+          <span class="bm-chip bm-warn" id="bm-suspicious"
+            >3 suspicious entities</span
+          >
+        </div>
+        <div class="bm-map" id="bm-map">
+          <svg class="bm-edges" id="bm-map-edges" aria-hidden="true"></svg>
+          <div class="bm-map-cols">
+            <div class="bm-map-col">
+              <div class="bm-label">Identities</div>
+              <button
+                type="button"
+                class="bm-node"
+                data-entity="alex.chen"
+                aria-pressed="false"
+              >
+                <span class="bm-node-name"
+                  ><i
+                    class="bm-icon"
+                    data-lucide="user-round"
+                    aria-hidden="true"
+                  ></i
+                  >alex.chen</span
+                ><span class="bm-node-status">Suspicious evidence</span></button
+              ><button
+                type="button"
+                class="bm-node"
+                data-entity="morgan.lee"
+                aria-pressed="false"
+              >
+                <span class="bm-node-name"
+                  ><i
+                    class="bm-icon"
+                    data-lucide="user-round"
+                    aria-hidden="true"
+                  ></i
+                  >morgan.lee</span
+                ><span class="bm-node-status">Observed activity</span></button
+              ><button
+                type="button"
+                class="bm-node"
+                data-entity="sam.rivera"
+                aria-pressed="false"
+              >
+                <span class="bm-node-name"
+                  ><i
+                    class="bm-icon"
+                    data-lucide="user-round"
+                    aria-hidden="true"
+                  ></i
+                  >sam.rivera</span
+                ><span class="bm-node-status">Observed activity</span>
+              </button>
+            </div>
+            <div class="bm-map-col">
+              <div class="bm-label">Hosts</div>
+              <button
+                type="button"
+                class="bm-node"
+                data-entity="ws-07"
+                aria-pressed="false"
+              >
+                <span class="bm-node-name"
+                  ><i
+                    class="bm-icon"
+                    data-lucide="monitor"
+                    aria-hidden="true"
+                  ></i
+                  >ws-07</span
+                ><span class="bm-node-status">Suspicious evidence</span></button
+              ><button
+                type="button"
+                class="bm-node"
+                data-entity="ws-03"
+                aria-pressed="false"
+              >
+                <span class="bm-node-name"
+                  ><i
+                    class="bm-icon"
+                    data-lucide="monitor"
+                    aria-hidden="true"
+                  ></i
+                  >ws-03</span
+                ><span class="bm-node-status">Observed activity</span></button
+              ><button
+                type="button"
+                class="bm-node"
+                data-entity="ws-11"
+                aria-pressed="false"
+              >
+                <span class="bm-node-name"
+                  ><i
+                    class="bm-icon"
+                    data-lucide="monitor"
+                    aria-hidden="true"
+                  ></i
+                  >ws-11</span
+                ><span class="bm-node-status">Observed activity</span>
+              </button>
+            </div>
+            <div class="bm-map-col">
+              <div class="bm-label">Services</div>
+              <button
+                type="button"
+                class="bm-node"
+                data-entity="files-01"
+                aria-pressed="false"
+              >
+                <span class="bm-node-name"
+                  ><i
+                    class="bm-icon"
+                    data-lucide="database"
+                    aria-hidden="true"
+                  ></i
+                  >files-01</span
+                ><span class="bm-node-status">Suspicious evidence</span></button
+              ><button
+                type="button"
+                class="bm-node"
+                data-entity="auth-01"
+                aria-pressed="false"
+              >
+                <span class="bm-node-name"
+                  ><i
+                    class="bm-icon"
+                    data-lucide="shield-check"
+                    aria-hidden="true"
+                  ></i
+                  >auth-01</span
+                ><span class="bm-node-status">Observed activity</span></button
+              ><button
+                type="button"
+                class="bm-node"
+                data-entity="dns-01"
+                aria-pressed="false"
+              >
+                <span class="bm-node-name"
+                  ><i
+                    class="bm-icon"
+                    data-lucide="server"
+                    aria-hidden="true"
+                  ></i
+                  >dns-01</span
+                ><span class="bm-node-status">Observed activity</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="bm-map-legend">
+          <div class="bm-flex">
+            <span><span class="bm-dot bm-good"></span>Observed connection</span
+            ><span
+              ><span class="bm-dot bm-warn"></span>Suspicious evidence</span
+            >
+          </div>
+          <span>9 entities shown</span>
+        </div>
+        <div class="bm-entity-summary" id="bm-entity-summary">
+          <span id="bm-entity-copy" class="bm-muted"
+            >Select an entity to inspect its evidence.</span
+          ><button type="button" id="bm-clear-entity" hidden>
+            Clear selection
+          </button>
+        </div>
+        <div class="bm-event-feed">
+          <div class="bm-event-head">
+            <h3>
+              Observable events
+              <span id="bm-event-count" class="bm-muted bm-small"></span>
+            </h3>
+            <button type="button" data-tab="events">
+              Explore events
+              <i
+                class="bm-icon"
+                data-lucide="arrow-up-right"
+                aria-hidden="true"
+              ></i>
+            </button>
+          </div>
+          <div class="bm-events" id="bm-events"></div>
+        </div>
+      </section>
+      <section class="bm-panel bm-rail" aria-label="Global SystemOne judgments">
+        <div class="bm-rail-head">
+          <div>
+            <h2>SystemOne judgments</h2>
+            <div class="bm-head-sub">Jev · Global environment assessment</div>
+          </div>
+          <span class="bm-chip" id="bm-batch-label">BATCH 007</span>
+        </div>
+        <div class="bm-error-strip" id="bm-error" hidden></div>
+        <div class="bm-judgments">
+          <section class="bm-judgment">
+            <div class="bm-q-title">
+              <button type="button" data-inspect="probability">
+                Is the environment compromised?
+                <i
+                  class="bm-icon bm-muted"
+                  data-lucide="arrow-up-right"
+                  aria-hidden="true"
+                ></i></button
+              ><span class="bm-q-type">NOUL</span>
+            </div>
+            <div class="bm-row">
+              <div class="bm-prob" id="bm-probability">94%</div>
+              <div class="bm-prob-sub" id="bm-prob-change">
+                +3 pp since 00:25
+              </div>
+            </div>
+            <div class="bm-track bm-prob-track">
+              <div class="bm-fill" id="bm-prob-fill" style="width: 94%"></div>
+            </div>
+            <div class="bm-q-footer">
+              <span>Probability of compromise</span
+              ><span class="bm-assessment-time">Snapshot 00:30</span>
+            </div>
+          </section>
+          <section class="bm-judgment">
+            <div class="bm-q-title">
+              <button type="button" data-inspect="classification">
+                What best describes the activity?
+                <i
+                  class="bm-icon bm-muted"
+                  data-lucide="arrow-up-right"
+                  aria-hidden="true"
+                ></i></button
+              ><span class="bm-q-type">CHOICE</span>
+            </div>
+            <div id="bm-classification"></div>
+            <div class="bm-q-footer">
+              <span id="bm-class-confidence">Confidence 0.91</span
+              ><span class="bm-assessment-time">Snapshot 00:30</span>
+            </div>
+          </section>
+          <section class="bm-judgment">
+            <div class="bm-q-title">
+              <button type="button" data-inspect="severity">
+                How severe is the activity?
+                <i
+                  class="bm-icon bm-muted"
+                  data-lucide="arrow-up-right"
+                  aria-hidden="true"
+                ></i></button
+              ><span class="bm-q-type">SCORE</span>
+            </div>
+            <div class="bm-row">
+              <span id="bm-severity" class="bm-mono">2.52 / 3</span
+              ><span class="bm-muted bm-small">Weighted score</span>
+            </div>
+            <div class="bm-levels" id="bm-severity-levels"></div>
+            <div class="bm-q-footer">
+              <span id="bm-severity-confidence">Confidence 0.72</span
+              ><span class="bm-assessment-time">Snapshot 00:30</span>
+            </div>
+          </section>
+          <section class="bm-judgment">
+            <div class="bm-q-title">
+              <button type="button" data-inspect="response">
+                What response is appropriate?
+                <i
+                  class="bm-icon bm-muted"
+                  data-lucide="arrow-up-right"
+                  aria-hidden="true"
+                ></i></button
+              ><span class="bm-q-type">CHOICE</span>
+            </div>
+            <div id="bm-response"></div>
+            <div class="bm-q-footer">
+              <span>Advisory only</span
+              ><span id="bm-response-confidence">Confidence 0.90</span>
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+    <section class="bm-history" aria-label="Assessment checkpoints">
+      <div class="bm-history-inner">
+        <div>
+          <div class="bm-label">Assessments</div>
+          <div class="bm-small bm-muted">Select to inspect</div>
+        </div>
+        <div class="bm-history-points" id="bm-checkpoints"></div>
+      </div>
+    </section>
+    <section class="bm-panel bm-flow-panel">
+      <div class="bm-flow-head">
+        <div><h2>Recorded decision path</h2></div>
+        <div class="bm-flex">
+          <span class="bm-chip" id="bm-flow-time">SNAPSHOT 00:30</span
+          ><button type="button" class="bm-mobile-flow" id="bm-toggle-flow">
+            Show graph
+          </button>
+        </div>
+      </div>
+      <div class="bm-flow-map" id="bm-flow-map">
+        <svg class="bm-edges" id="bm-flow-edges" aria-hidden="true"></svg>
+        <div class="bm-stage">
+          <div class="bm-label">01 / Evidence</div>
+          <button
+            type="button"
+            class="bm-flow-node"
+            data-flow="events"
+            data-inspect="events"
+          >
+            <strong id="bm-flow-events">12 observations</strong
+            ><small>Authentication · DNS<br />Network · Host metrics</small>
+          </button>
+        </div>
+        <div class="bm-stage">
+          <div class="bm-label">02 / Input</div>
+          <button
+            type="button"
+            class="bm-flow-node"
+            data-flow="snapshot"
+            data-inspect="snapshot"
+          >
+            <strong id="bm-flow-snapshot">Snapshot S007</strong
+            ><small>Observable state only<br />5 rolling windows</small>
+          </button>
+        </div>
+        <div class="bm-stage">
+          <div class="bm-label">03 / Judgments</div>
+          <div class="bm-flow-judgments">
+            <button
+              type="button"
+              class="bm-flow-node"
+              data-flow="probability"
+              data-inspect="probability"
+            >
+              <span>Compromise</span><span id="bm-flow-prob">94%</span></button
+            ><button
+              type="button"
+              class="bm-flow-node"
+              data-flow="classification"
+              data-inspect="classification"
+            >
+              <span>Class</span
+              ><span id="bm-flow-class">compromise</span></button
+            ><button
+              type="button"
+              class="bm-flow-node"
+              data-flow="severity"
+              data-inspect="severity"
+            >
+              <span>Severity</span
+              ><span id="bm-flow-severity">2.52</span></button
+            ><button
+              type="button"
+              class="bm-flow-node"
+              data-flow="response"
+              data-inspect="response"
+            >
+              <span>Advisory</span><span id="bm-flow-response">escalate</span>
+            </button>
+          </div>
+        </div>
+        <div class="bm-stage">
+          <div class="bm-label">04 / Policy</div>
+          <button
+            type="button"
+            class="bm-flow-node"
+            data-flow="policy"
+            data-inspect="policy"
+          >
+            <strong id="bm-flow-policy">4 / 4 matched</strong
+            ><small>Incident conditions<br />Inspect every condition</small>
+          </button>
+        </div>
+        <div class="bm-stage">
+          <div class="bm-label">05 / Investigation</div>
+          <button
+            type="button"
+            class="bm-flow-node"
+            data-flow="investigation"
+            data-inspect="investigation"
+          >
+            <strong id="bm-flow-investigation">Open</strong
+            ><small id="bm-flow-investigation-sub"
+              >Opened at 00:20<br />No new transition</small
+            >
+          </button>
+        </div>
+      </div>
+      <div class="bm-flow-note">
+        Recorded application behavior · Entity highlighting uses a separate
+        evidence rule · Confidence describes distribution concentration
+      </div>
+    </section>
+  </div>
+  <section class="bm-panel bm-explorer" id="bm-events-view" hidden>
+    <div class="bm-panel-head bm-row">
+      <div>
+        <h2>Event explorer</h2>
+        <div class="bm-head-sub" id="bm-explorer-scope">
+          Observations through 00:30
+        </div>
+      </div>
+      <span
+        id="bm-result-count"
+        class="bm-muted bm-small"
+        aria-live="polite"
+      ></span>
+    </div>
+    <div class="bm-search-row">
+      <label
+        >Search recorded fields<input
+          type="search"
+          id="bm-search"
+          placeholder="Entity, observation, event ID…" /></label
+      ><label
+        >Event type<select id="bm-type">
+          <option value="all">All types</option>
+          <option value="Authentication">Authentication</option>
+          <option value="DNS">DNS</option>
+          <option value="Network">Network</option>
+          <option value="Host metric">Host metric</option>
+        </select></label
+      ><label
+        >Activity period<select id="bm-period">
+          <option value="all">Warm-up + live</option>
+          <option value="live">Live activity</option>
+          <option value="warmup">Warm-up only</option>
+        </select></label
+      >
+    </div>
+    <div class="bm-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Time</th>
+            <th scope="col">Type</th>
+            <th scope="col">Entities</th>
+            <th scope="col">Observation</th>
+            <th scope="col">Evidence</th>
+          </tr>
+        </thead>
+        <tbody id="bm-explorer-rows"></tbody>
+      </table>
+      <div class="bm-empty" id="bm-no-results" hidden>
+        No observations match these filters.
+      </div>
+    </div>
+  </section>
+  <section
+    class="bm-panel bm-investigation-view"
+    id="bm-investigation-view"
+    hidden
+  >
+    <div class="bm-row">
+      <h2>Investigation · run-042</h2>
+      <span class="bm-chip bm-warn" id="bm-investigation-status">OPEN</span>
+    </div>
+    <p id="bm-investigation-description">
+      An applied assessment opened this investigation at 00:20.
+    </p>
+    <div id="bm-investigation-history"></div>
+    <div class="bm-flex" style="margin-top: 14px">
+      <button type="button" id="bm-open-trigger">
+        Inspect triggering assessment</button
+      ><button type="button" id="bm-acknowledge">Acknowledge</button
+      ><button type="button" id="bm-close-investigation">
+        Close investigation
+      </button>
+    </div>
+    <p class="bm-small">
+      Preview actions are local. Acknowledgement and closure do not remediate
+      entities. The next matching assessment can reopen a closed investigation.
+    </p>
+  </section>
+  <section
+    class="bm-detail"
+    id="bm-detail"
+    hidden
+    aria-label="Selected evidence detail"
+  >
+    <div class="bm-detail-head bm-row">
+      <div>
+        <h2 id="bm-detail-title">Assessment detail</h2>
+        <div class="bm-head-sub" id="bm-detail-context">Snapshot 00:30</div>
+      </div>
+      <button
+        type="button"
+        id="bm-close-detail"
+        aria-label="Close evidence detail"
+      >
+        <i class="bm-icon" data-lucide="x" aria-hidden="true"></i> Close
+      </button>
+    </div>
+    <div class="bm-detail-content" id="bm-detail-content"></div>
+  </section>
+  <div class="bm-toast" id="bm-toast" hidden aria-live="polite"></div>
+  <footer class="bm-footer">
+    <span
+      >Local prototype · Illustrative telemetry and model responses · No API
+      calls</span
+    ><span class="bm-mono" id="bm-footer-state">VIEW 00:30 / LATEST 00:30</span>
+  </footer>
+</div>
+<script>
+  (() => {
+    const root = document.getElementById("blackout-monitor");
+    const $ = (selector) => root.querySelector(selector),
+      $$ = (selector) => Array.from(root.querySelectorAll(selector));
+    const escape = (value) =>
+      String(value).replace(
+        /[&<>"']/g,
+        (c) =>
+          ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          })[c],
+      );
+    const time = (t) =>
+      (t < 0 ? "-" : "") + "00:" + String(Math.abs(t)).padStart(2, "0");
+    const percent = (n) => Math.round(n * 100) + "%";
+    const weighted = (values) => values.reduce((sum, v, i) => sum + v * i, 0);
+    const winner = (values) => values.indexOf(Math.max(...values));
+    const classes = ["normal", "benign_anomaly", "suspicious", "compromise"];
+    const responses = ["observe", "investigate", "escalate"];
+    const samples = [
+      {
+        t: 0,
+        p: 0.03,
+        c: [0.88, 0.08, 0.035, 0.005],
+        s: [0.9, 0.08, 0.015, 0.005],
+        r: [0.98, 0.015, 0.005],
+        confidence: 0.9,
+        latency: 386,
+      },
+      {
+        t: 5,
+        p: 0.06,
+        c: [0.8, 0.12, 0.07, 0.01],
+        s: [0.75, 0.2, 0.04, 0.01],
+        r: [0.96, 0.035, 0.005],
+        confidence: 0.84,
+        latency: 399,
+      },
+      {
+        t: 10,
+        p: 0.24,
+        c: [0.48, 0.19, 0.29, 0.04],
+        s: [0.47, 0.38, 0.12, 0.03],
+        r: [0.64, 0.31, 0.05],
+        confidence: 0.52,
+        latency: 427,
+      },
+      {
+        t: 15,
+        p: 0.57,
+        c: [0.14, 0.11, 0.62, 0.13],
+        s: [0.11, 0.55, 0.27, 0.07],
+        r: [0.18, 0.74, 0.08],
+        confidence: 0.66,
+        latency: 403,
+      },
+      {
+        t: 20,
+        p: 0.84,
+        c: [0.02, 0.03, 0.14, 0.81],
+        s: [0.01, 0.08, 0.68, 0.23],
+        r: [0.03, 0.28, 0.69],
+        confidence: 0.78,
+        latency: 438,
+      },
+      {
+        t: 25,
+        p: 0.91,
+        c: [0.01, 0.02, 0.05, 0.92],
+        s: [0, 0.03, 0.6, 0.37],
+        r: [0.01, 0.1, 0.89],
+        confidence: 0.89,
+        latency: 408,
+      },
+      {
+        t: 30,
+        p: 0.94,
+        c: [0.01, 0.01, 0.03, 0.95],
+        s: [0, 0.02, 0.44, 0.54],
+        r: [0.01, 0.05, 0.94],
+        confidence: 0.91,
+        latency: 412,
+      },
+      { t: 35, error: "Request timed out" },
+      {
+        t: 40,
+        p: 0.86,
+        c: [0.02, 0.03, 0.1, 0.85],
+        s: [0.01, 0.09, 0.64, 0.26],
+        r: [0.02, 0.17, 0.81],
+        confidence: 0.82,
+        latency: 431,
+      },
+      {
+        t: 45,
+        p: 0.68,
+        c: [0.08, 0.13, 0.58, 0.21],
+        s: [0.08, 0.42, 0.41, 0.09],
+        r: [0.1, 0.74, 0.16],
+        confidence: 0.61,
+        latency: 397,
+      },
+      {
+        t: 50,
+        p: 0.39,
+        c: [0.22, 0.28, 0.42, 0.08],
+        s: [0.27, 0.49, 0.21, 0.03],
+        r: [0.35, 0.58, 0.07],
+        confidence: 0.48,
+        latency: 417,
+      },
+      {
+        t: 55,
+        p: 0.18,
+        c: [0.6, 0.29, 0.09, 0.02],
+        s: [0.61, 0.3, 0.08, 0.01],
+        r: [0.77, 0.21, 0.02],
+        confidence: 0.65,
+        latency: 391,
+      },
+      {
+        t: 60,
+        p: 0.09,
+        c: [0.78, 0.16, 0.05, 0.01],
+        s: [0.8, 0.16, 0.035, 0.005],
+        r: [0.93, 0.06, 0.01],
+        confidence: 0.82,
+        latency: 405,
+      },
+    ];
+    const events = [
+      {
+        t: -20,
+        id: 101,
+        type: "Authentication",
+        entities: ["morgan.lee", "ws-03", "auth-01"],
+        text: "Successful sign-in · known device",
+        points: 0,
+      },
+      {
+        t: -15,
+        id: 102,
+        type: "Authentication",
+        entities: ["sam.rivera", "ws-11", "auth-01"],
+        text: "Successful sign-in · known device",
+        points: 0,
+      },
+      {
+        t: -10,
+        id: 103,
+        type: "DNS",
+        entities: ["ws-03", "dns-01"],
+        text: "Query: intranet.internal",
+      },
+      {
+        t: 0,
+        id: 104,
+        type: "Host metric",
+        entities: ["ws-07"],
+        text: "CPU 34% · memory 48%",
+        cpu: 34,
+        memory: 48,
+      },
+      {
+        t: 4,
+        id: 105,
+        type: "Network",
+        entities: ["ws-11", "files-01"],
+        text: "Connection established · 12 KB sent",
+      },
+      {
+        t: 8,
+        id: 106,
+        type: "Authentication",
+        entities: ["alex.chen", "ws-07", "auth-01"],
+        text: "Sign-in failed",
+        points: 1,
+        attack: true,
+      },
+      {
+        t: 11,
+        id: 107,
+        type: "Authentication",
+        entities: ["alex.chen", "ws-07", "auth-01"],
+        text: "Sign-in failed",
+        points: 1,
+        attack: true,
+      },
+      {
+        t: 14,
+        id: 108,
+        type: "Authentication",
+        entities: ["alex.chen", "ws-07"],
+        text: "Successful sign-in · unfamiliar device",
+        points: 3,
+        attack: true,
+      },
+      {
+        t: 18,
+        id: 109,
+        type: "Authentication",
+        entities: ["alex.chen", "ws-07", "files-01"],
+        text: "Access to unfamiliar resource: files-01",
+        points: 3,
+        attack: true,
+      },
+      {
+        t: 22,
+        id: 110,
+        type: "Authentication",
+        entities: ["alex.chen", "ws-07", "auth-01"],
+        text: "Sign-in failed",
+        points: 1,
+        attack: true,
+      },
+      {
+        t: 26,
+        id: 111,
+        type: "DNS",
+        entities: ["ws-07", "dns-01"],
+        text: "Query: files.internal",
+      },
+      {
+        t: 28,
+        id: 112,
+        type: "Network",
+        entities: ["ws-07", "files-01"],
+        text: "Connection established · 56 KB sent",
+      },
+      {
+        t: 30,
+        id: 113,
+        type: "Network",
+        entities: ["ws-07", "files-01"],
+        text: "Transfer observed · 128 KB sent",
+      },
+      {
+        t: 34,
+        id: 114,
+        type: "Host metric",
+        entities: ["ws-07"],
+        text: "CPU 72% · memory 61%",
+        cpu: 72,
+        memory: 61,
+      },
+      {
+        t: 39,
+        id: 115,
+        type: "DNS",
+        entities: ["ws-03", "dns-01"],
+        text: "Query: intranet.internal",
+      },
+      {
+        t: 44,
+        id: 116,
+        type: "Authentication",
+        entities: ["alex.chen", "ws-07", "auth-01"],
+        text: "Successful sign-in · known device",
+        points: 0,
+      },
+      {
+        t: 49,
+        id: 117,
+        type: "Host metric",
+        entities: ["ws-07"],
+        text: "CPU 41% · memory 52%",
+        cpu: 41,
+        memory: 52,
+      },
+      {
+        t: 54,
+        id: 118,
+        type: "Network",
+        entities: ["ws-11", "files-01"],
+        text: "Connection established · 9 KB sent",
+      },
+      {
+        t: 59,
+        id: 119,
+        type: "Authentication",
+        entities: ["sam.rivera", "ws-11", "auth-01"],
+        text: "Successful sign-in · known device",
+        points: 0,
+      },
+    ];
+    const state = {
+      latest: 30,
+      pinned: null,
+      playing: false,
+      scenario: "attack",
+      entity: null,
+      tab: "monitor",
+      detail: null,
+      actions: [],
+      flowExpanded: root.clientWidth > 760,
+    };
+    let timer = null;
+    const viewTime = () => state.pinned ?? state.latest;
+    function series() {
+      if (state.scenario === "attack") return samples;
+      return samples.map((d, i) => {
+        if (state.scenario === "baseline")
+          return {
+            ...samples[0],
+            t: d.t,
+            p: [0.03, 0.04, 0.025][i % 3],
+            latency: 380 + i * 3,
+          };
+        const p = [
+          0.03, 0.06, 0.14, 0.26, 0.34, 0.29, 0.21, 0.16, 0.12, 0.09, 0.07,
+          0.06, 0.04,
+        ][i];
+        return {
+          ...samples[0],
+          t: d.t,
+          p,
+          c: p > 0.1 ? [0.12, 0.76, 0.1, 0.02] : [0.79, 0.17, 0.035, 0.005],
+          s: p > 0.1 ? [0.21, 0.65, 0.12, 0.02] : [0.84, 0.13, 0.025, 0.005],
+          r: p > 0.1 ? [0.71, 0.27, 0.02] : [0.96, 0.035, 0.005],
+          confidence: 0.8,
+          latency: 390 + i * 2,
+        };
+      });
+    }
+    function attempt() {
+      return series().find((s) => s.t === viewTime()) ?? series()[0];
+    }
+    function result() {
+      return series()
+        .filter((s) => s.t <= viewTime() && !s.error)
+        .at(-1);
+    }
+    function observed() {
+      return events.filter(
+        (e) => e.t <= viewTime() && (!e.attack || state.scenario === "attack"),
+      );
+    }
+    function evidence() {
+      return observed().filter(
+        (e) =>
+          e.entities.includes("alex.chen") &&
+          e.t > viewTime() - 30 &&
+          (e.points ?? 0) > 0,
+      );
+    }
+    function suspicious() {
+      return evidence().reduce((sum, e) => sum + e.points, 0) >= 4;
+    }
+    function policy(d) {
+      return (
+        !d.error &&
+        d.p >= 0.8 &&
+        winner(d.c) === 3 &&
+        d.confidence >= 0.75 &&
+        weighted(d.s) >= 2
+      );
+    }
+    function investigationAt(t) {
+      let status = "Not opened",
+        opened = null;
+      const history = [];
+      for (const d of series().filter((s) => s.t <= t)) {
+        if (policy(d) && (status === "Not opened" || status === "Closed")) {
+          const label = status === "Closed" ? "Reopened" : "Opened";
+          status = "Open";
+          opened ??= d.t;
+          history.push({ t: d.t, status, label });
+        }
+        for (const a of state.actions.filter((a) => a.t === d.t)) {
+          status = a.status;
+          history.push({
+            t: a.t,
+            status,
+            label: status === "Closed" ? "Closed by operator" : "Acknowledged",
+          });
+        }
+      }
+      return { status, opened, history };
+    }
+    function dist(target, labels, values) {
+      $(target).innerHTML = values
+        .map(
+          (v, i) =>
+            `<div class="bm-dist" data-selected="${i === winner(values)}"><span class="bm-dist-label">${escape(labels[i])}</span><div class="bm-track"><div class="bm-fill" style="width:${v * 100}%"></div></div><span class="bm-number">${percent(v)}</span></div>`,
+        )
+        .join("");
+    }
+    function setText(id, value) {
+      $(id).textContent = value;
+    }
+    function drawEdges(parent, svg, pairs) {
+      const box = parent.getBoundingClientRect();
+      if (!box.width || !box.height) return;
+      svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+      svg.innerHTML = pairs
+        .map(([a, b, active]) => {
+          const ae = parent.querySelector(a),
+            be = parent.querySelector(b);
+          if (!ae || !be) return "";
+          const A = ae.getBoundingClientRect(),
+            B = be.getBoundingClientRect();
+          let x1 = A.right - box.left,
+            y1 = A.top + A.height / 2 - box.top,
+            x2 = B.left - box.left,
+            y2 = B.top + B.height / 2 - box.top;
+          let d;
+          if (B.top > A.bottom && Math.abs(A.left - B.left) < 25) {
+            x1 = A.left + A.width / 2 - box.left;
+            y1 = A.bottom - box.top;
+            x2 = B.left + B.width / 2 - box.left;
+            y2 = B.top - box.top;
+            const m = (y1 + y2) / 2;
+            d = `M${x1},${y1} C${x1},${m} ${x2},${m} ${x2},${y2}`;
+          } else {
+            const m = (x1 + x2) / 2;
+            d = `M${x1},${y1} C${m},${y1} ${m},${y2} ${x2},${y2}`;
+          }
+          return `<path class="bm-edge" data-active="${active}" d="${d}"/>`;
+        })
+        .join("");
+    }
+    function redraw() {
+      const warning = suspicious(),
+        visible = observed();
+      const links = new Map();
+      for (const e of visible.filter(
+        (e) =>
+          e.type === "Authentication" ||
+          e.type === "Network" ||
+          e.type === "DNS",
+      )) {
+        for (let i = 0; i < e.entities.length - 1; i++) {
+          const a = e.entities[i],
+            b = e.entities[i + 1];
+          if ($(`[data-entity="${a}"]`) && $(`[data-entity="${b}"]`))
+            links.set(a + "|" + b, [
+              `[data-entity="${a}"]`,
+              `[data-entity="${b}"]`,
+              warning && e.entities.includes("alex.chen"),
+            ]);
+        }
+      }
+      drawEdges($("#bm-map"), $("#bm-map-edges"), [...links.values()]);
+      const keys = ["probability", "classification", "severity", "response"];
+      const active = policy(attempt());
+      const pairs = [
+        ['[data-flow="events"]', '[data-flow="snapshot"]', false],
+        ...keys.map((k) => [
+          '[data-flow="snapshot"]',
+          `[data-flow="${k}"]`,
+          false,
+        ]),
+        ...keys
+          .filter((k) => k !== "response")
+          .map((k) => [`[data-flow="${k}"]`, '[data-flow="policy"]', active]),
+        ['[data-flow="policy"]', '[data-flow="investigation"]', active],
+      ];
+      drawEdges($("#bm-flow-map"), $("#bm-flow-edges"), pairs);
+    }
+    function renderEvents() {
+      const all = observed().filter(
+        (e) => !state.entity || e.entities.includes(state.entity),
+      );
+      setText("#bm-event-count", `· ${all.length} in view`);
+      $("#bm-events").innerHTML =
+        all
+          .slice(-4)
+          .reverse()
+          .map(
+            (e) =>
+              `<button type="button" class="bm-event" data-event="${e.id}"><span class="bm-event-time">${time(e.t)}</span><span class="bm-family">${e.type === "Authentication" ? "Auth" : e.type}</span><span>${escape(e.entities[0] + " · " + e.text)}</span></button>`,
+          )
+          .join("") ||
+        '<div class="bm-empty">No observations in this view.</div>';
+      const q = $("#bm-search").value.toLowerCase();
+      const type = $("#bm-type").value,
+        period = $("#bm-period").value;
+      const found = all.filter(
+        (e) =>
+          (type === "all" || e.type === type) &&
+          (period === "all" || (period === "warmup" ? e.t < 0 : e.t >= 0)) &&
+          JSON.stringify(e).toLowerCase().includes(q),
+      );
+      setText(
+        "#bm-result-count",
+        `${found.length} of ${all.length} observations`,
+      );
+      setText(
+        "#bm-explorer-scope",
+        `Observations through ${time(viewTime())}${state.entity ? " · " + state.entity : ""}`,
+      );
+      $("#bm-explorer-rows").innerHTML = found
+        .slice()
+        .reverse()
+        .map(
+          (e) =>
+            `<tr><td class="bm-mono">${time(e.t)}</td><td>${escape(e.type)}</td><td>${escape(e.entities.join(", "))}</td><td>${escape(e.text)}</td><td><button type="button" data-event="${e.id}">#${e.id}</button></td></tr>`,
+        )
+        .join("");
+      $("#bm-no-results").hidden = found.length > 0;
+    }
+    function renderDetail() {
+      if (!state.detail) {
+        $("#bm-detail").hidden = true;
+        return;
+      }
+      $("#bm-detail").hidden = false;
+      const d = result(),
+        a = attempt(),
+        kind = state.detail;
+      const inv = investigationAt(viewTime());
+      const inputs = {
+        snapshot_time_seconds: viewTime(),
+        scope: "global_environment",
+        recent_authentication_failures: observed().filter(
+          (e) =>
+            e.type === "Authentication" &&
+            e.text === "Sign-in failed" &&
+            e.t > viewTime() - 30,
+        ).length,
+        unfamiliar_authentication_observations: evidence().filter(
+          (e) => e.points === 3,
+        ).length,
+        evidence_event_ids: observed().map((e) => e.id),
+      };
+      let title = "",
+        left = "",
+        right = "";
+      const list = observed().filter(
+        (e) => !state.entity || e.entities.includes(state.entity),
+      );
+      const evidenceMarkup = `<div><span class="bm-label">Supporting observations</span><ul>${
+        list
+          .slice(-5)
+          .map((e) => `<li>${time(e.t)} · #${e.id} · ${escape(e.text)}</li>`)
+          .join("") || "<li>No observations in this snapshot.</li>"
+      }</ul></div>`;
+      if (kind.startsWith("event:")) {
+        const e = observed().find((e) => e.id === Number(kind.split(":")[1]));
+        if (!e) {
+          state.detail = null;
+          $("#bm-detail").hidden = true;
+          return;
+        }
+        title = `Event #${e.id} · ${e.type}`;
+        left = `<div><span class="bm-label">Observation</span><p>${escape(e.text)}</p><p>${escape(e.entities.join(" → "))}</p></div>`;
+        right = `<div><span class="bm-label">Recorded fields · sample</span><pre>${escape(JSON.stringify(e, null, 2))}</pre></div>`;
+      } else if (kind === "policy") {
+        title = "Incident policy";
+        const checks = [
+          ["Compromise probability ≥ 0.80", d.p >= 0.8, percent(d.p)],
+          [
+            "Classification = compromise",
+            winner(d.c) === 3,
+            classes[winner(d.c)],
+          ],
+          [
+            "Classification confidence ≥ 0.75",
+            d.confidence >= 0.75,
+            d.confidence.toFixed(2),
+          ],
+          ["Severity ≥ 2", weighted(d.s) >= 2, weighted(d.s).toFixed(2)],
+        ];
+        left = `<div><span class="bm-label">advisory-policy/2</span>${checks.map(([label, match, value]) => `<div class="bm-rule-row"><span>${label}</span><span class="${a.error ? "bm-warn" : match ? "bm-good" : "bm-muted"}">${a.error ? "Unevaluable" : match ? "Matched" : "Not matched"} · ${a.error ? "—" : value}</span></div>`).join("")}<p class="bm-muted bm-small">All four conditions must match. Advisory response is displayed separately and is not an incident-opening condition.</p></div>`;
+        right = evidenceMarkup;
+      } else if (kind === "investigation") {
+        title = "Investigation history";
+        left = `<div><span class="bm-label">${escape(inv.status)}</span>${inv.history.map((e) => `<p>${time(e.t)} · ${e.label}</p>`).join("") || "<p>No applied assessment has opened an investigation.</p>"}<p class="bm-muted">A decline in probability does not close this investigation.</p></div>`;
+        right =
+          '<div><span class="bm-label">Operator actions</span><p>Review the triggering assessment and recorded transitions in the Investigation view.</p><button type="button" data-tab="investigation">Open investigation</button></div>';
+      } else if (kind === "events") {
+        title = "Observable evidence";
+        left = evidenceMarkup;
+        right = `<div><span class="bm-label">Snapshot boundary</span><p>${list.length} observations available through ${time(viewTime())}.</p><p class="bm-muted">Warm-up history is included. Future observations are excluded.</p><button type="button" data-tab="events">Open event explorer</button></div>`;
+      } else {
+        const names = {
+          snapshot: "Observable snapshot",
+          probability: "Probability of compromise",
+          classification: "Activity classification",
+          severity: "Activity severity",
+          response: "Recommended response",
+        };
+        title = names[kind] ?? "Assessment";
+        const output = a.error
+          ? { status: "unavailable", error: a.error }
+          : kind === "probability"
+            ? { probability: d.p }
+            : kind === "classification"
+              ? {
+                  selected: classes[winner(d.c)],
+                  probabilities: Object.fromEntries(
+                    classes.map((name, i) => [name, d.c[i]]),
+                  ),
+                  confidence: d.confidence,
+                }
+              : kind === "severity"
+                ? { score: weighted(d.s), probabilities: d.s, confidence: 0.72 }
+                : kind === "response"
+                  ? {
+                      selected: responses[winner(d.r)],
+                      probabilities: Object.fromEntries(
+                        responses.map((name, i) => [name, d.r[i]]),
+                      ),
+                      confidence: 0.9,
+                    }
+                  : { snapshot: inputs };
+        left = `<div><span class="bm-label">${kind === "snapshot" ? "Input snapshot" : "Returned response"} · sample</span><pre>${escape(JSON.stringify(output, null, 2))}</pre></div>`;
+        right = `<div><span class="bm-label">Input · observable state</span><p>${time(viewTime())} · ${observed().length} recorded observations · global assessment</p><details><summary>Inspect sample input fields</summary><pre>${escape(JSON.stringify(inputs, null, 2))}</pre></details>${evidenceMarkup}</div>`;
+      }
+      setText("#bm-detail-title", title);
+      setText(
+        "#bm-detail-context",
+        `Inspecting ${time(viewTime())} · ${state.scenario === "attack" ? "run-042" : state.scenario === "baseline" ? "run-041" : "run-040"} · illustrative data`,
+      );
+      $("#bm-detail-content").innerHTML = left + right;
+    }
+    function render() {
+      const t = viewTime(),
+        a = attempt(),
+        d = result(),
+        data = series(),
+        previous = data.filter((s) => s.t < d.t && !s.error).at(-1);
+      const warning = suspicious();
+      const inv = investigationAt(t);
+      const newer = data.filter(
+        (s) => s.t > t && s.t <= state.latest && !s.error,
+      ).length;
+      setText("#bm-clock", time(state.latest));
+      setText(
+        "#bm-session-name",
+        `acme-lab / ${state.scenario === "attack" ? "run-042" : state.scenario === "baseline" ? "run-041" : "run-040"}`,
+      );
+      setText(
+        "#bm-run-status",
+        state.playing
+          ? "Preview playing"
+          : state.latest === 60
+            ? "Preview complete"
+            : "Preview paused",
+      );
+      setText(
+        "#bm-telemetry-status",
+        `Telemetry through ${time(state.latest)}`,
+      );
+      const latestAttempt = data.find((s) => s.t === state.latest);
+      setText(
+        "#bm-model-status",
+        latestAttempt.error
+          ? "Model unavailable · timeout"
+          : `Model response · ${latestAttempt.latency} ms`,
+      );
+      $("#bm-model-status").classList.toggle(
+        "bm-warn",
+        Boolean(latestAttempt.error),
+      );
+      setText(
+        "#bm-injection-status",
+        state.scenario === "attack"
+          ? state.latest < 35
+            ? "Injection active · credential compromise"
+            : "Injection stopped at 00:35"
+          : state.scenario === "benign"
+            ? "Benign maintenance control"
+            : "Baseline activity",
+      );
+      $("#bm-play").innerHTML =
+        `<i class="bm-icon" data-lucide="${state.playing ? "pause" : "play"}" aria-hidden="true"></i> ${state.playing ? "Pause preview" : state.latest === 60 ? "Replay preview" : "Play preview"}`;
+      $("#bm-pin-banner").hidden = state.pinned === null;
+      setText(
+        "#bm-pin-copy",
+        `Inspecting ${time(t)} · ${newer} newer assessment${newer === 1 ? "" : "s"}${state.playing ? " · preview continues" : ""}`,
+      );
+      setText("#bm-map-time", time(t));
+      const activeEntities = new Set(
+        observed()
+          .filter((e) => e.t > t - 30)
+          .flatMap((e) => e.entities),
+      );
+      const suspects = new Set(
+        warning
+          ? [
+              "alex.chen",
+              "ws-07",
+              ...new Set(
+                evidence()
+                  .flatMap((e) => e.entities)
+                  .filter((e) => e === "files-01" || e === "auth-01"),
+              ),
+            ]
+          : [],
+      );
+      setText(
+        "#bm-suspicious",
+        `${suspects.size} suspicious entit${suspects.size === 1 ? "y" : "ies"}`,
+      );
+      $$("[data-entity]").forEach((el) => {
+        const name = el.dataset.entity;
+        el.dataset.suspicious = String(suspects.has(name));
+        el.setAttribute("aria-pressed", String(name === state.entity));
+        el.querySelector(".bm-node-status").textContent = suspects.has(name)
+          ? "Suspicious evidence"
+          : activeEntities.has(name)
+            ? "Observed activity"
+            : "No recent evidence";
+      });
+      $("#bm-clear-entity").hidden = !state.entity;
+      if (state.entity) {
+        const metrics = observed()
+          .filter(
+            (e) =>
+              e.type === "Host metric" && e.entities.includes(state.entity),
+          )
+          .at(-1);
+        setText(
+          "#bm-entity-copy",
+          `${state.entity} · ${suspects.has(state.entity) ? "Suspicious evidence" : "Observable activity"}${metrics ? ` · CPU ${metrics.cpu}% / memory ${metrics.memory}%` : ""}${state.entity === "alex.chen" ? ` · evidence score ${evidence().reduce((sum, e) => sum + e.points, 0)}` : ""}`,
+        );
+      } else
+        setText("#bm-entity-copy", "Select an entity to inspect its evidence.");
+      setText("#bm-batch-label", `BATCH ${String(t / 5 + 1).padStart(3, "0")}`);
+      $("#bm-error").hidden = !a.error;
+      setText(
+        "#bm-error",
+        a.error
+          ? `Latest evaluation unavailable. Showing last success at ${time(d.t)} · ${t - d.t}s old.`
+          : "",
+      );
+      setText("#bm-probability", percent(d.p));
+      const delta = previous ? Math.round((d.p - previous.p) * 100) : 0;
+      setText(
+        "#bm-prob-change",
+        previous
+          ? `${delta >= 0 ? "+" : ""}${delta} pp since ${time(previous.t)}`
+          : "Initial assessment",
+      );
+      $("#bm-prob-fill").style.width = d.p * 100 + "%";
+      dist("#bm-classification", classes, d.c);
+      dist("#bm-response", responses, d.r);
+      setText("#bm-class-confidence", `Confidence ${d.confidence.toFixed(2)}`);
+      setText("#bm-severity", weighted(d.s).toFixed(2) + " / 3");
+      $("#bm-severity-levels").innerHTML = d.s
+        .map(
+          (v, i) =>
+            `<div class="bm-level" data-selected="${i === winner(d.s)}"><span>Level ${i}</span><strong>${percent(v)}</strong><div class="bm-track"><div class="bm-fill" style="width:${v * 100}%"></div></div></div>`,
+        )
+        .join("");
+      $$(".bm-assessment-time").forEach(
+        (el) => (el.textContent = `Snapshot ${time(d.t)}`),
+      );
+      $("#bm-checkpoints").innerHTML = data
+        .filter((s) => s.t <= state.latest)
+        .map(
+          (s) =>
+            `<button type="button" data-checkpoint="${s.t}" aria-label="Inspect assessment at ${time(s.t)}${s.error ? ", unavailable" : ""}" aria-pressed="${s.t === t}" data-failed="${Boolean(s.error)}"><strong>${s.error ? "—" : percent(s.p)}</strong><span>${time(s.t)}</span></button>`,
+        )
+        .join("");
+      setText("#bm-flow-time", `SNAPSHOT ${time(t)}`);
+      setText("#bm-flow-events", `${observed().length} observations`);
+      setText(
+        "#bm-flow-snapshot",
+        `Snapshot S${String(t / 5 + 1).padStart(3, "0")}`,
+      );
+      setText("#bm-flow-prob", a.error ? "—" : percent(d.p));
+      setText("#bm-flow-class", a.error ? "—" : classes[winner(d.c)]);
+      setText("#bm-flow-severity", a.error ? "—" : weighted(d.s).toFixed(2));
+      setText("#bm-flow-response", a.error ? "—" : responses[winner(d.r)]);
+      const matched = [
+        d.p >= 0.8,
+        winner(d.c) === 3,
+        d.confidence >= 0.75,
+        weighted(d.s) >= 2,
+      ].filter(Boolean).length;
+      setText(
+        "#bm-flow-policy",
+        a.error ? "Unevaluable" : `${matched} / 4 matched`,
+      );
+      $('[data-flow="policy"]').dataset.matched = String(policy(a));
+      setText("#bm-flow-investigation", inv.status);
+      $('[data-flow="investigation"]').dataset.matched = String(
+        inv.status === "Open",
+      );
+      setText(
+        "#bm-flow-investigation-sub",
+        inv.opened !== null
+          ? `Opened ${time(inv.opened)} · ${inv.history.at(-1)?.t === t ? inv.history.at(-1).label : "No new transition"}`
+          : "No incident transition",
+      );
+      setText("#bm-investigation-status", inv.status.toUpperCase());
+      setText(
+        "#bm-investigation-description",
+        inv.opened !== null
+          ? `An applied assessment opened this investigation at ${time(inv.opened)}.`
+          : "No applied assessment has opened an investigation in this view.",
+      );
+      $("#bm-investigation-history").innerHTML = inv.history
+        .map(
+          (e) =>
+            `<div class="bm-rule-row"><span class="bm-mono">${time(e.t)}</span><span>${e.label}</span><span class="bm-muted">${e.label === "Opened" || e.label === "Reopened" ? "advisory-policy" : "local-operator"}</span></div>`,
+        )
+        .join("");
+      const canAct = state.pinned === null && inv.opened !== null;
+      $("#bm-acknowledge").disabled = !canAct || inv.status !== "Open";
+      $("#bm-close-investigation").disabled =
+        !canAct || inv.status === "Closed";
+      $("#bm-open-trigger").disabled = inv.opened === null;
+      setText(
+        "#bm-footer-state",
+        `VIEW ${time(t)} / LATEST ${time(state.latest)}`,
+      );
+      $("#bm-monitor-view").hidden = state.tab !== "monitor";
+      $("#bm-events-view").hidden = state.tab !== "events";
+      $("#bm-investigation-view").hidden = state.tab !== "investigation";
+      $$("nav [data-tab]").forEach((el) =>
+        el.setAttribute("aria-pressed", String(el.dataset.tab === state.tab)),
+      );
+      $("#bm-flow-map").hidden = root.clientWidth <= 760 && !state.flowExpanded;
+      setText(
+        "#bm-toggle-flow",
+        state.flowExpanded ? "Hide graph" : "Show graph",
+      );
+      renderEvents();
+      renderDetail();
+      if (globalThis.lucide)
+        lucide.createIcons({ attrs: { width: 15, height: 15 } });
+      requestAnimationFrame(redraw);
+    }
+    function stop() {
+      clearTimeout(timer);
+      timer = null;
+      state.playing = false;
+    }
+    function schedule() {
+      clearTimeout(timer);
+      if (!state.playing) return;
+      timer = setTimeout(
+        () => {
+          state.latest = Math.min(60, state.latest + 5);
+          if (state.latest === 60) stop();
+          render();
+          schedule();
+        },
+        5000 / Number($("#bm-speed").value),
+      );
+    }
+    function load(scenario, at = 30) {
+      stop();
+      state.scenario = scenario;
+      state.latest = at;
+      state.pinned = null;
+      state.entity = null;
+      state.detail = null;
+      state.actions = [];
+      state.tab = "monitor";
+      $("#bm-search").value = "";
+      $("#bm-type").value = "all";
+      $("#bm-period").value = "all";
+      $("#bm-recording-drawer").hidden = true;
+      $("#bm-simulation-drawer").hidden = true;
+      $("#bm-scenario").value = scenario;
+      render();
+    }
+    function inspect(kind) {
+      if (state.pinned === null) state.pinned = state.latest;
+      state.detail = kind;
+      render();
+      requestAnimationFrame(() =>
+        $("#bm-detail").scrollIntoView({
+          block: "nearest",
+          behavior: "instant",
+        }),
+      );
+    }
+    root.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button || !root.contains(button)) return;
+      if (button.dataset.tab) {
+        state.tab = button.dataset.tab;
+        state.detail = null;
+        render();
+      } else if (button.dataset.entity) {
+        state.entity =
+          state.entity === button.dataset.entity ? null : button.dataset.entity;
+        render();
+      } else if (button.dataset.checkpoint !== undefined) {
+        state.pinned = Number(button.dataset.checkpoint);
+        state.detail = null;
+        render();
+      } else if (button.dataset.inspect) {
+        if (button.closest(".bm-judgment") && attempt().error)
+          state.pinned = result().t;
+        inspect(button.dataset.inspect);
+      } else if (button.dataset.event) {
+        inspect("event:" + button.dataset.event);
+      } else if (button.dataset.load) {
+        load(button.dataset.load);
+      } else if (button.dataset.close) {
+        $("#" + button.dataset.close).hidden = true;
+      }
+    });
+    $("#bm-play").addEventListener("click", () => {
+      if (state.playing) stop();
+      else {
+        if (state.latest === 60) load(state.scenario, 0);
+        state.playing = true;
+        schedule();
+      }
+      render();
+    });
+    $("#bm-speed").addEventListener("change", schedule);
+    $("#bm-follow").addEventListener("click", () => {
+      state.pinned = null;
+      state.detail = null;
+      render();
+    });
+    $("#bm-clear-entity").addEventListener("click", () => {
+      state.entity = null;
+      render();
+    });
+    $("#bm-recordings").addEventListener("click", () => {
+      $("#bm-recording-drawer").hidden = !$("#bm-recording-drawer").hidden;
+    });
+    $("#bm-controls").addEventListener("click", () => {
+      $("#bm-simulation-drawer").hidden = !$("#bm-simulation-drawer").hidden;
+    });
+    $("#bm-restart").addEventListener("click", () =>
+      load($("#bm-scenario").value, 0),
+    );
+    $("#bm-show-outage").addEventListener("click", () => load("attack", 35));
+    $("#bm-close-detail").addEventListener("click", () => {
+      state.detail = null;
+      render();
+    });
+    $("#bm-search").addEventListener("input", renderEvents);
+    $("#bm-type").addEventListener("change", renderEvents);
+    $("#bm-period").addEventListener("change", renderEvents);
+    $("#bm-toggle-flow").addEventListener("click", () => {
+      state.flowExpanded = !state.flowExpanded;
+      render();
+    });
+    $("#bm-open-trigger").addEventListener("click", () => {
+      state.pinned = investigationAt(viewTime()).opened;
+      state.tab = "monitor";
+      state.detail = "policy";
+      render();
+    });
+    $("#bm-acknowledge").addEventListener("click", () => {
+      state.actions.push({ t: state.latest, status: "Acknowledged" });
+      render();
+    });
+    $("#bm-close-investigation").addEventListener("click", () => {
+      state.actions.push({ t: state.latest, status: "Closed" });
+      render();
+    });
+    let lastWidth = 0;
+    new ResizeObserver(() => {
+      const width = root.clientWidth;
+      if (Math.abs(width - lastWidth) > 2) {
+        lastWidth = width;
+        $(".bm-workspace").style.gridTemplateColumns =
+          width <= 760
+            ? "1fr"
+            : {
+                balanced: "1.55fr 1fr",
+                environment: "1.85fr 1fr",
+                judgments: "1.2fr 1fr",
+              }[design.rail];
+        $("#bm-flow-map").hidden = width <= 760 && !state.flowExpanded;
+        requestAnimationFrame(redraw);
+      }
+    }).observe(root);
+    const design = { rail: "balanced", preview: "escalation" };
+    function applyDesign() {
+      const ratios = {
+        balanced: "1.55fr 1fr",
+        environment: "1.85fr 1fr",
+        judgments: "1.2fr 1fr",
+      };
+      $(".bm-workspace").style.gridTemplateColumns =
+        root.clientWidth > 760 ? ratios[design.rail] : "1fr";
+      const preset = {
+        escalation: ["attack", 30],
+        baseline: ["baseline", 30],
+        benign: ["benign", 25],
+        unavailable: ["attack", 35],
+        inspection: ["attack", 30],
+      };
+      const [scenario, at] = preset[design.preview];
+      load(scenario, at);
+      if (design.preview === "inspection") {
+        state.pinned = 20;
+        render();
+      }
+    }
+    render();
+    if (globalThis.Tweak) {
+      const tweak = new Tweak({ container: root, onChange: applyDesign });
+      tweak.addSelect(design, "rail", {
+        label: "Panel balance",
+        options: [
+          { label: "Balanced", value: "balanced" },
+          { label: "More environment", value: "environment" },
+          { label: "More judgments", value: "judgments" },
+        ],
+      });
+      tweak.addSelect(design, "preview", {
+        label: "Preview state",
+        options: [
+          { label: "Escalation", value: "escalation" },
+          { label: "Baseline", value: "baseline" },
+          { label: "Benign control", value: "benign" },
+          { label: "Model unavailable", value: "unavailable" },
+          { label: "Historical inspection", value: "inspection" },
+        ],
+      });
+    }
+  })();
+</script>
