@@ -192,6 +192,8 @@ export function TelemetryInspector({
   recording,
   backendUrl,
   decisionId = null,
+  snapshotId = "latest",
+  onSnapshotSelect,
   selectedEntityId = null,
   selectedEventSequence = null,
   onEntitySelect,
@@ -200,6 +202,8 @@ export function TelemetryInspector({
   recording: Recording;
   backendUrl: string;
   decisionId?: string | null;
+  snapshotId?: string;
+  onSnapshotSelect: (id: string) => void;
   selectedEntityId?: string | null;
   selectedEventSequence?: number | null;
   onEntitySelect: (id: string | null) => void;
@@ -209,7 +213,6 @@ export function TelemetryInspector({
   const [kind, setKind] = useState("all");
   const [identity, setIdentity] = useState("");
   const [hostId, setHostId] = useState("");
-  const [snapshotId, setSnapshotId] = useState("latest");
   const [windowMs, setWindowMs] = useState(10_000);
   const [metricName, setMetricName] = useState<AggregateMetric["name"]>(
     "authenticationAttempts",
@@ -240,12 +243,7 @@ export function TelemetryInspector({
   const host =
     organization?.hosts.find((item) => item.id === hostId) ??
     organization?.hosts[0];
-  const selectedDecision = recording.attempts.find(
-    (item) => item.id === decisionId,
-  );
-  const evidenceSnapshotId = decisionId
-    ? selectedDecision?.snapshotId
-    : snapshotId;
+  const evidenceSnapshotId = snapshotId;
   const snapshot =
     evidenceSnapshotId === "latest"
       ? recording.snapshots.at(-1)
@@ -275,7 +273,6 @@ export function TelemetryInspector({
         selectedResource !== undefined &&
         event.query === selectedResource.domain);
     return (
-      (!decisionId || !!selectedDecision) &&
       event.simulationTimeMs <=
         (snapshot?.simulationTimeMs ?? recording.run.simulationTimeMs) &&
       (visiblePhase === "all" ||
@@ -436,8 +433,8 @@ export function TelemetryInspector({
               data-testid="decision-evidence"
             >
               Evidence for selected decision · {snapshot.id} ·{" "}
-              {seconds(snapshot.simulationTimeMs)}. Choose “Follow latest
-              attempt” in the Decision Inspector to release this snapshot.
+              {seconds(snapshot.simulationTimeMs)}. Return to the live or
+              playback position to release this snapshot.
             </p>
           )}
           <div className="my-4 flex flex-wrap gap-4">
@@ -448,7 +445,7 @@ export function TelemetryInspector({
                 value={evidenceSnapshotId ?? "latest"}
                 disabled={!!decisionId}
                 className={`${control} mt-2 block`}
-                onChange={(event) => setSnapshotId(event.target.value)}
+                onChange={(event) => onSnapshotSelect(event.target.value)}
               >
                 <option value="latest">Follow latest</option>
                 {recording.snapshots.map((item) => (
@@ -495,7 +492,7 @@ export function TelemetryInspector({
                 onClick={() => {
                   setMetricName(item.name);
                   setShowFocus(false);
-                  setSnapshotId(snapshot.id);
+                  if (!decisionId) onSnapshotSelect(snapshot.id);
                 }}
               >
                 <span className="block text-xs text-slate-300">
@@ -528,7 +525,7 @@ export function TelemetryInspector({
                   className={`${button} mt-3`}
                   onClick={() => {
                     setShowFocus(true);
-                    setSnapshotId(snapshot.id);
+                    if (!decisionId) onSnapshotSelect(snapshot.id);
                   }}
                 >
                   Inspect focus evidence

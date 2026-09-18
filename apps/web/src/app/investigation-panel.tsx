@@ -129,8 +129,8 @@ export function InvestigationPanel({
       )}
       {readOnly && configured && (
         <p className="text-sm text-slate-400">
-          Playback is read-only. Investigation actions shown here are stored
-          history.
+          Historical inspection is read-only. Return to the live position or the
+          end of playback to act on this investigation.
         </p>
       )}
       {(status === "open" || status === "acknowledged") && (

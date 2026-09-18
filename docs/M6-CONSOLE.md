@@ -16,14 +16,17 @@ actions. All response recommendations remain advisory.
    Each incident rule reports Matched, Not matched or Unevaluable. Confidence
    appears in the response only where Jev supplied it. Noul has no confidence
    field; Choice and Score confidence describes distribution concentration.
-4. **Observable state** holds the selected attempt's snapshot. Choose a rolling
+4. The topology, judgments, metrics, investigation and **Observable state** all
+   hold the selected attempt's checkpoint. Choose a rolling
    window and metric to inspect its contributing observations. **Recorded
    events** uses that snapshot's time as an inclusive cutoff; type, entity and
    warm-up/live filters apply within that boundary. Later observations cannot
    appear as evidence for the selected decision.
-5. Choose **Follow latest attempt** to release the decision selection. The
-   current successful decision and its age continue above the inspector while
-   a historical attempt is selected. A `?run=…&decision=…` address restores the
+5. Choose **Return to live** to restore every view to the latest saved state,
+   or **Return to playback** to follow the separate playback position. The
+   inspection strip shows the checkpoint and counts newer successfully applied
+   assessments; failures do not increase that count. Recording and simulation
+   controls continue independently. A `?run=…&decision=…` address restores the
    selection after reload. An unknown decision ID produces an explicit error.
 
 The probability plot uses unsmoothed points at recorded simulation times. It
@@ -40,9 +43,20 @@ policy only after resume. Receipt and application timestamps remain distinct.
 Saved, unapplied responses are labeled as such; they do not count as applied
 decisions or retroactively open an investigation.
 
+Historical selection freezes the projection, including when the simulation
+later resumes or finishes at the same simulation time. The response inspector
+still shows the selected request and receipt/application timestamps when its
+result was applied after that checkpoint. Later investigation transitions are
+excluded using application timing and the triggering transition's revision.
+Without a transition revision, an operator action with an identical wall
+timestamp has no provable ordering relative to the assessment and is omitted.
+Older results without application metadata retain checkpoint-based visibility.
+Investigation actions require returning to live or the end of playback.
+
 ## Metrics
 
-Metrics cover the selected run and do not change with event filters.
+Metrics cover the inspected timeline through its cursor and do not change with
+event filters. Historical ages use simulation time, not the current wall clock.
 
 | Metric                        | Definition                                                                                                                                                                   |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

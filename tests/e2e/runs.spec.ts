@@ -103,7 +103,7 @@ test("records unavailable Jev attempts and inspects saved model and policy evide
   await expect(page.getByText("85.0%", { exact: true })).toBeVisible();
   await expect(
     page.getByText("Last successful decision:", { exact: false }),
-  ).toContainText("Snapshot age: 1.0 simulation seconds");
+  ).toContainText("Snapshot age: 0.0 simulation seconds");
   await page
     .getByText("Application policy: incident_advisory", { exact: true })
     .click();
@@ -312,6 +312,9 @@ test("inspects organization history, held snapshot evidence and both comparison 
     timeout: 15_000,
   });
   await seekToEnd(page);
+  await page
+    .getByRole("button", { name: "Return to playback", exact: true })
+    .click();
   await expect(page.getByTestId("window-boundary")).toContainText(
     "snapshot-000010",
   );
@@ -658,6 +661,7 @@ test("plays, seeks, reproduces and reevaluates a saved recording", async ({
   await page.getByRole("button", { name: "Start run", exact: true }).click();
   await expect(page.getByText("Completed", { exact: true })).toBeVisible();
   const sourceId = await page.getByTestId("run-id").textContent();
+  await page.reload();
 
   await expect(
     page.getByText("Recorded playback · offline · simulation read-only", {

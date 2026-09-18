@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import type { Recording } from "@blackout/contracts";
+import type { InferenceAttempt, Recording } from "@blackout/contracts";
 import { visibleAttempts } from "./decision-view";
 import { DecisionTimeline } from "./decision-timeline";
 
@@ -28,11 +28,17 @@ export function DecisionInspector({
   recording,
   connected,
   selectedId,
+  selectedAssessment,
+  availableAttempts = recording.attempts,
+  historical = false,
   onSelect,
 }: {
   recording: Recording;
   connected: boolean;
   selectedId: string | null;
+  selectedAssessment?: InferenceAttempt | null;
+  availableAttempts?: InferenceAttempt[];
+  historical?: boolean;
   onSelect: (id: string | null) => void;
 }) {
   const [now, setNow] = useState<number | null>(null);
@@ -40,17 +46,18 @@ export function DecisionInspector({
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
-  const { attempts, run } = recording;
+  const { run } = recording;
   const visible = visibleAttempts(recording);
   const latest = visible.at(-1);
   const success = visible.findLast(
     (attempt) => attempt.status === "succeeded" && attempt.appliedAt !== null,
   );
   const selected = selectedId
-    ? attempts.find((attempt) => attempt.id === selectedId)
+    ? (selectedAssessment ??
+      recording.attempts.find((attempt) => attempt.id === selectedId))
     : latest;
   const enabled = run.manifest.schemaVersion === 2 && !!run.manifest.evaluation;
-  const active = run.status === "running";
+  const active = run.status === "running" && !historical;
   const pending = latest?.status === "pending";
   const failed = latest?.status === "failed";
   const ageSimulation = success
@@ -61,19 +68,21 @@ export function DecisionInspector({
       ? Math.max(0, (now - Date.parse(success.completedAt)) / 1000)
       : null;
   const answers = selected?.response?.answers;
-  const state = !enabled
-    ? "Not enabled"
-    : !active
-      ? "Recorded results"
-      : !connected
-        ? "Disconnected — state may be stale"
-        : run.controls?.paused
-          ? "Paused — live decisions frozen; saved attempts remain inspectable"
-          : pending
-            ? "Waiting for Jev — simulation held"
-            : failed
-              ? "Unavailable — last decision may be stale"
-              : "Live inference";
+  const state = historical
+    ? "Historical inspection — all views pinned to this checkpoint"
+    : !enabled
+      ? "Not enabled"
+      : !active
+        ? "Recorded results"
+        : !connected
+          ? "Disconnected — state may be stale"
+          : run.controls?.paused
+            ? "Paused — live decisions frozen; saved attempts remain inspectable"
+            : pending
+              ? "Waiting for Jev — simulation held"
+              : failed
+                ? "Unavailable — last decision may be stale"
+                : "Live inference";
   return (
     <section
       className="mb-8 min-w-0 space-y-4 rounded-lg border border-violet-400/40 bg-violet-950/10 p-4 sm:p-5"
@@ -136,7 +145,7 @@ export function DecisionInspector({
                   }}
                 >
                   <option value="latest">Follow latest attempt</option>
-                  {attempts.map((attempt) => (
+                  {availableAttempts.map((attempt) => (
                     <option key={attempt.id} value={attempt.id}>
                       {attempt.simulationTimeMs / 1000}s · attempt{" "}
                       {attempt.attemptNumber} · {attempt.status}
@@ -147,10 +156,24 @@ export function DecisionInspector({
               <p className="text-xs text-slate-400">
                 {selectedId
                   ? active
-                    ? "Inspecting a saved attempt. Its snapshot and event cutoff are held below; live decisions continue above."
+                    ? "Inspecting a saved attempt. All inspected views use its recorded checkpoint."
                     : "Inspecting a saved attempt from this recording."
                   : "Following the newest attempt."}
               </p>
+              {selected.appliedAt === null && selected.status !== "pending" && (
+                <p className="text-sm text-amber-200">
+                  Received but not applied. This response has not changed the
+                  applied judgment or investigation.
+                </p>
+              )}
+              {selected.appliedSimulationTimeMs != null &&
+                selected.appliedSimulationTimeMs > run.simulationTimeMs && (
+                  <p className="text-sm text-amber-200">
+                    Applied after this checkpoint, at{" "}
+                    {selected.appliedSimulationTimeMs / 1000} s. The
+                    investigation below reflects the inspected time.
+                  </p>
+                )}
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Value label="Snapshot">
                   {selected.snapshotId} · {selected.simulationTimeMs / 1000}s
