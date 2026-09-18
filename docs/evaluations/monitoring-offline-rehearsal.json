@@ -1,0 +1,160 @@
+{
+  "recordedAt": "2026-09-18T07:07:39.934Z",
+  "keyConfigured": false,
+  "modelCalls": 0,
+  "mutations": 0,
+  "rehearsal": [
+    {
+      "fixture": "baseline",
+      "runId": "b23a233a-daa1-4c71-bba6-31932134806b",
+      "checkpoints": [
+        {
+          "cursorMs": 0,
+          "attemptId": "05f1430a-c94a-44b2-8db6-b08550e2a84d",
+          "model": "jev-1.13.0",
+          "values": ["19.0%", "normal", "0.92 / 3", "observe"],
+          "policy": "observe"
+        },
+        {
+          "cursorMs": 5000,
+          "attemptId": "ff9be80b-639e-4d24-b05e-e9b416605769",
+          "model": "jev-1.13.0",
+          "values": ["16.0%", "normal", "0.86 / 3", "observe"],
+          "policy": "observe"
+        },
+        {
+          "cursorMs": 15000,
+          "attemptId": "3862203f-7376-43e6-8bd2-e42db3ce01f1",
+          "model": "jev-1.13.0",
+          "values": ["20.0%", "suspicious", "1.03 / 3", "investigate"],
+          "policy": "review"
+        },
+        {
+          "cursorMs": 30000,
+          "attemptId": "9161f194-8dce-4c68-ba30-a1974e8355e8",
+          "model": "jev-1.13.0",
+          "values": ["18.0%", "suspicious", "1.00 / 3", "investigate"],
+          "policy": "review"
+        },
+        {
+          "cursorMs": 35000,
+          "attemptId": "28ced564-4e26-4fdf-a85f-ef1710a8d432",
+          "model": "jev-1.13.0",
+          "values": ["12.0%", "normal", "0.79 / 3", "observe"],
+          "policy": "observe"
+        },
+        {
+          "cursorMs": 95000,
+          "attemptId": "8a72d51c-f229-4ba7-a4fa-ca129084d60b",
+          "model": "jev-1.13.0",
+          "values": ["17.0%", "normal", "0.84 / 3", "observe"],
+          "policy": "observe"
+        }
+      ],
+      "investigationTransitions": []
+    },
+    {
+      "fixture": "credential-compromise",
+      "runId": "2e67bf4e-85ee-4f08-8bb5-8e695a5251e3",
+      "checkpoints": [
+        {
+          "cursorMs": 0,
+          "attemptId": "7b155978-2259-45ba-a90d-f76ce4a09d8d",
+          "model": "jev-1.13.0",
+          "values": ["19.0%", "normal", "0.92 / 3", "observe"],
+          "policy": "observe"
+        },
+        {
+          "cursorMs": 5000,
+          "attemptId": "4bfe352a-d8aa-42bf-a2d5-8d6d9cb1ded0",
+          "model": "jev-1.13.0",
+          "values": ["67.0%", "suspicious", "1.72 / 3", "investigate"],
+          "policy": "review"
+        },
+        {
+          "cursorMs": 15000,
+          "attemptId": "0d1de236-8b39-482c-93c8-dbf0dba366bd",
+          "model": "jev-1.13.0",
+          "values": ["80.0%", "compromise", "1.94 / 3", "escalate"],
+          "policy": "review"
+        },
+        {
+          "cursorMs": 30000,
+          "attemptId": "5cd30c54-e485-4f70-bc2f-a52f39b43db3",
+          "model": "jev-1.13.0",
+          "values": ["84.0%", "compromise", "2.20 / 3", "escalate"],
+          "policy": "incident_advisory"
+        },
+        {
+          "cursorMs": 35000,
+          "attemptId": "c1eae05f-6335-4d41-bbfb-bcef65709109",
+          "model": "jev-1.13.0",
+          "values": ["85.0%", "compromise", "2.22 / 3", "escalate"],
+          "policy": "incident_advisory"
+        },
+        {
+          "cursorMs": 95000,
+          "attemptId": "042ee2bd-ee96-4335-9b64-e75bd120605c",
+          "model": "jev-1.13.0",
+          "values": ["43.0%", "compromise", "1.87 / 3", "investigate"],
+          "policy": "review"
+        }
+      ],
+      "investigationTransitions": [
+        {
+          "type": "opened",
+          "timeMs": 20000
+        }
+      ]
+    },
+    {
+      "fixture": "benign-maintenance",
+      "runId": "4842c469-3bf1-4e87-b4ed-85a3fb1690bb",
+      "checkpoints": [
+        {
+          "cursorMs": 0,
+          "attemptId": "ecbbb1d7-049d-4171-b6bd-d87cc5168a6d",
+          "model": "jev-1.13.0",
+          "values": ["19.0%", "normal", "0.95 / 3", "observe"],
+          "policy": "observe"
+        },
+        {
+          "cursorMs": 5000,
+          "attemptId": "b5d9df89-b67c-43bd-9c09-123bfcc60e27",
+          "model": "jev-1.13.0",
+          "values": ["35.0%", "suspicious", "1.16 / 3", "investigate"],
+          "policy": "review"
+        },
+        {
+          "cursorMs": 15000,
+          "attemptId": "5e58e8d4-1ce8-4b9d-ad71-048987e41a82",
+          "model": "jev-1.13.0",
+          "values": ["21.0%", "normal", "0.98 / 3", "observe"],
+          "policy": "observe"
+        },
+        {
+          "cursorMs": 30000,
+          "attemptId": "aef02cf7-2b00-4ea1-804b-6b9b8e8e1991",
+          "model": "jev-1.13.0",
+          "values": ["16.0%", "normal", "0.73 / 3", "observe"],
+          "policy": "observe"
+        },
+        {
+          "cursorMs": 35000,
+          "attemptId": "55c83e2a-0997-4a9f-a83a-7fa2514c90c3",
+          "model": "jev-1.13.0",
+          "values": ["13.0%", "normal", "0.54 / 3", "observe"],
+          "policy": "observe"
+        },
+        {
+          "cursorMs": 95000,
+          "attemptId": "71c9d4ce-6e7f-432d-8295-dfa19909dc30",
+          "model": "jev-1.13.0",
+          "values": ["17.0%", "normal", "0.81 / 3", "observe"],
+          "policy": "observe"
+        }
+      ],
+      "investigationTransitions": []
+    }
+  ]
+}

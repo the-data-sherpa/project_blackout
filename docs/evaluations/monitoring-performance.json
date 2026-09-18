@@ -1,0 +1,22 @@
+{
+  "recordedAt": "2026-09-18T07:07:15.337Z",
+  "browser": "153.0.8010.12",
+  "platform": "linux",
+  "osRelease": "7.2.5-3-omarchy",
+  "cpu": "AMD Ryzen 7 5800X 8-Core Processor",
+  "logicalCpus": 16,
+  "memoryGiB": 31.3,
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "durationMs": 120000,
+  "events": 5240,
+  "eventRows": 50,
+  "relationships": 64,
+  "seekToRenderMs": 182.52,
+  "heapMiB": 49.66,
+  "relationshipsWithRetainedSelection": 65,
+  "animations": 12,
+  "reducedMotion": true
+}

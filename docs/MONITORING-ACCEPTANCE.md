@@ -109,15 +109,21 @@ The browser suite writes `test-results/monitoring-performance.json` and
 run replaces the results directory. Release verification uses its own Compose
 project and volume, clears the model key, and removes only its own test storage.
 
-| Budget                               | Acceptance threshold                 |
-| ------------------------------------ | ------------------------------------ |
-| Recording                            | 120 seconds, more than 5,000 events  |
-| Event rows                           | At most 50                           |
-| Relationships                        | 64, plus one retained selection      |
-| Simultaneous relationship animations | At most 12; none with reduced motion |
-| Stream queue                         | 128 entries, then resynchronize      |
-| Seek to rendered evidence            | Less than 1,000 ms                   |
-| Browser JS heap                      | Less than 128 MiB                    |
+| Budget                               | Acceptance threshold                 | Measured result                                          |
+| ------------------------------------ | ------------------------------------ | -------------------------------------------------------- |
+| Recording                            | 120 seconds, more than 5,000 events  | 120 seconds, 5,240 events                                |
+| Event rows                           | At most 50                           | 50                                                       |
+| Relationships                        | 64, plus one retained selection      | 64; 65 with retained selection                           |
+| Simultaneous relationship animations | At most 12; none with reduced motion | 12; disabled with reduced motion                         |
+| Stream queue                         | 128 entries, then resynchronize      | 129-message burst resynchronized before controls enabled |
+| Seek to rendered evidence            | Less than 1,000 ms                   | 182.52 ms                                                |
+| Browser JS heap                      | Less than 128 MiB                    | 49.66 MiB                                                |
+
+The [performance artifact](evaluations/monitoring-performance.json) was recorded
+on September 18, 2026 with Chromium 153.0.8010.12, Linux 7.2.5-3-omarchy,
+AMD Ryzen 7 5800X (16 logical CPUs), 31.3 GiB memory and a 1280 × 720 measurement
+viewport. The seek measurement includes the browser-driver round trip and rendered
+evidence assertion. The heap value is Chromium's `JSHeapUsedSize`, not process RSS.
 
 Measurements are local observations on the recorded browser and hardware, not
 universal latency guarantees. The application loads the complete bounded recording;
@@ -126,11 +132,13 @@ keyboard and narrow-layout checks are targeted regression coverage, not a comple
 assistive-technology audit. Copied links require access to the same local database;
 they do not transfer recordings. No fresh paid benchmark was run for this work.
 
-## Review
+## Standards review
 
 Standards review found no documented-standard violations. It identified optional
 consolidation of lifecycle labels and repeated recording-navigation URL cleanup;
 these are maintainability suggestions, not release blockers.
+
+## Spec review
 
 Spec review identified historical-boundary and URL-restoration errors. Fixes
 preserve receipt/application phase, command and history sequence cutoffs, the
@@ -140,5 +148,21 @@ a URL. Follow-up review found no remaining material issue in these fixes.
 
 ## Final validation
 
-Final clean-checkout results and measured artifacts are recorded here after the
-complete suite and packaged rehearsal finish.
+Validated on September 18, 2026 from an isolated checkout at `dc1ebd3` using
+Node 24.21.0. Clean `npm ci`, formatting, lint, TypeScript checking, all 103
+unit/integration tests, production build and all 25 Chromium browser tests passed.
+The [packaged release rehearsal](evaluations/monitoring-release-verification.json)
+passed all six check groups against a fresh Compose volume.
+
+The [offline rehearsal](evaluations/monitoring-offline-rehearsal.json) records all
+18 inspected checkpoints across three real-response recordings, with the model key
+absent, zero new model calls and zero mutations. The
+[desktop screenshot](evaluations/monitoring-desktop.png) and
+[narrow screenshot](evaluations/monitoring-mobile.png) preserve the checked layout.
+These are local results; the repository's push CI repeats the software and container
+checks. The acceptance artifacts and this record are the only additions after the
+validated implementation.
+
+Review totals: no standards violations, two optional maintainability suggestions;
+six spec defects corrected, with no remaining material finding in the follow-up
+review.
