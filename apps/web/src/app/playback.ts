@@ -71,7 +71,6 @@ function controlsAt(commands: RunCommand[], cursor: number, source: Recording) {
   }
   return {
     paused,
-    pausedAttemptId: null,
     requestedSpeed,
     waitingForInference: false,
     pendingApplication: false,
@@ -168,4 +167,93 @@ export class PlaybackIndex {
       investigationHistory,
     };
   }
+}
+
+export type Inspection = {
+  recording: Recording;
+  assessment: InferenceAttempt | null;
+};
+
+export function inspectAssessment(
+  source: Recording,
+  id: string,
+): Inspection | null {
+  const assessment = source.attempts.find((attempt) => attempt.id === id);
+  if (!assessment) return null;
+  const at = assessment.simulationTimeMs;
+  const wall =
+    assessment.appliedAt ?? assessment.completedAt ?? assessment.startedAt;
+  const projection = new PlaybackIndex(source).at(at);
+  const attempts = projection.attempts.filter((attempt) => {
+    // Legacy results became visible at their checkpoint. Modern results must
+    // have actually entered the display by the selected assessment's boundary.
+    if (attempt.appliedAt === undefined) return true;
+    if (attempt.status === "pending") return attempt.startedAt <= wall;
+    return attempt.appliedAt !== null && attempt.appliedAt <= wall;
+  });
+  const appliedIds = new Set(
+    attempts
+      .filter((attempt) => attempt.appliedAt !== null)
+      .map((attempt) => attempt.id),
+  );
+  const transition = source.investigationHistory.find(
+    (event) => event.attemptId === id,
+  );
+  const investigationHistory = projection.investigationHistory.filter(
+    (event) => {
+      if (event.attemptId !== null && !appliedIds.has(event.attemptId))
+        return false;
+      if (transition) return event.runRevision <= transition.runRevision;
+      // Operator actions sharing a wall timestamp cannot be ordered relative to
+      // an attempt without a recorded revision. Do not claim they preceded it.
+      return (
+        event.recordedAt < wall ||
+        (event.recordedAt === wall && event.attemptId !== null)
+      );
+    },
+  );
+  return {
+    assessment,
+    recording: {
+      ...projection,
+      attempts,
+      investigationHistory,
+      commands: projection.commands.filter(
+        (command) => command.recordedAt <= wall,
+      ),
+      run: {
+        ...projection.run,
+        manifest: {
+          ...projection.run.manifest,
+          resolvedModel:
+            [...attempts]
+              .reverse()
+              .find(
+                (attempt) =>
+                  attempt.status === "succeeded" && attempt.appliedAt !== null,
+              )?.response?.model ?? null,
+        },
+      },
+    },
+  };
+}
+
+export function newerAssessmentCount(
+  source: Recording,
+  inspection: Inspection,
+) {
+  const visible = new Set(
+    inspection.recording.attempts
+      .filter(
+        (attempt) =>
+          attempt.status === "succeeded" && attempt.appliedAt !== null,
+      )
+      .map((attempt) => attempt.id),
+  );
+  return source.attempts.filter(
+    (attempt) =>
+      attempt.status === "succeeded" &&
+      attempt.appliedAt !== null &&
+      !visible.has(attempt.id),
+  ).length;
 }

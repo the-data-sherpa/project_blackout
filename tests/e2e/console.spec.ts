@@ -154,14 +154,23 @@ test("follows exact timeline evidence, filters observations, and persists operat
       "snapshot-000006 · 5 s",
     );
     await page
-      .getByRole("button", { name: /Inspect 6s · attempt 1 · failed/ })
-      .click();
+      .getByLabel("Decision Inspector", { exact: true })
+      .selectOption(saved.attempts[2]!.id);
     await expect(page.getByTestId("decision-evidence")).toContainText(
       "snapshot-000007 · 6 s",
     );
     await expect(
       page.getByText(/Selected attempt: malformed_response/),
     ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "Acknowledge investigation",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await page
+      .getByRole("button", { name: "Return to playback", exact: true })
+      .click();
     await page
       .getByRole("button", { name: "Acknowledge investigation", exact: true })
       .click();

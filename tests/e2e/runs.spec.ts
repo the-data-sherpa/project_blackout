@@ -14,6 +14,7 @@ test("records unavailable Jev attempts and inspects saved model and policy evide
   request,
 }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Start run", exact: true }),
   ).toBeEnabled();
@@ -100,10 +101,14 @@ test("records unavailable Jev attempts and inspects saved model and policy evide
   await expect(
     page.getByLabel("Decision Inspector", { exact: true }),
   ).toHaveValue(attempt.id);
-  await expect(page.getByText("85.0%", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "Jev decisions", exact: true })
+      .getByText("85.0%", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText("Last successful decision:", { exact: false }),
-  ).toContainText("Snapshot age: 1.0 simulation seconds");
+  ).toContainText("Snapshot age: 0.0 simulation seconds");
   await page
     .getByText("Application policy: incident_advisory", { exact: true })
     .click();
@@ -133,43 +138,44 @@ test("starts, watches, reloads and inspects isolated seeded recordings", async (
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Start run", exact: true }),
   ).toBeEnabled();
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await page.getByLabel("Seed", { exact: true }).fill("browser-demo");
   await page.getByLabel("Duration (simulation seconds)").fill("3");
   await page.getByRole("button", { name: "Start run", exact: true }).click();
   await expect(page.getByText("Running", { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Start run", exact: true }),
-  ).toBeDisabled();
+  await expect(page.locator('button[type="submit"]')).toBeDisabled();
   const firstUrl = page.url();
   const firstId = await page.getByTestId("run-id").textContent();
+  await page
+    .getByRole("button", { name: "Recordings & storage", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: `Inspect run ${firstId}` }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Monitor", exact: true }).click();
   await expect(page.getByTestId("event-count")).toHaveText("4515");
   await expect(page.getByText("Completed", { exact: true })).toBeVisible();
   await seekToEnd(page);
   await expect(page.getByTestId("simulation-time")).toHaveText("3.0 / 3 s");
   await expect(page.getByTestId("event-row")).toHaveCount(15);
   const firstEvents = await page.getByTestId("event-row").allInnerTexts();
+  await page
+    .getByRole("button", { name: "Simulation & details", exact: true })
+    .click();
   await page.getByText("Manifest and command log", { exact: true }).click();
   await expect(
-    page
-      .locator("details")
-      .filter({
-        has: page.getByText("Manifest and command log", { exact: true }),
-      })
-      .locator("pre"),
+    page.locator(
+      'details:has(> summary:text-is("Manifest and command log")) pre',
+    ),
   ).toContainText('"seed": "browser-demo"');
   await expect(
-    page
-      .locator("details")
-      .filter({
-        has: page.getByText("Manifest and command log", { exact: true }),
-      })
-      .locator("pre"),
+    page.locator(
+      'details:has(> summary:text-is("Manifest and command log")) pre',
+    ),
   ).toContainText('"type": "start"');
   await page.reload();
   await seekToEnd(page);
@@ -178,19 +184,21 @@ test("starts, watches, reloads and inspects isolated seeded recordings", async (
     firstEvents,
   );
 
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await page.getByLabel("Seed", { exact: true }).fill("browser-demo");
   await page.getByLabel("Duration (simulation seconds)").fill("3");
   await page.getByRole("button", { name: "Start run", exact: true }).click();
   await expect(page.getByTestId("run-id")).not.toHaveText(firstId!);
   const secondId = await page.getByTestId("run-id").textContent();
+  await page
+    .getByRole("button", { name: "Recordings & storage", exact: true })
+    .click();
   await page.getByRole("button", { name: `Inspect run ${firstId}` }).click();
   await expect(page.getByTestId("run-id")).toHaveText(firstId!);
   await expect(
-    page.getByText("Viewing saved events.", { exact: false }),
+    page.getByText(/Saved recording · offline playback/),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Start run", exact: true }),
-  ).toBeDisabled();
+  await expect(page.locator('button[type="submit"]')).toBeDisabled();
   await page.getByRole("button", { name: "View active run" }).click();
   await expect(page.getByTestId("run-id")).toHaveText(secondId!);
   await expect(page.getByText("Completed", { exact: true })).toBeVisible();
@@ -203,13 +211,22 @@ test("starts, watches, reloads and inspects isolated seeded recordings", async (
   await seekToEnd(page);
   await expect(page.getByTestId("run-id")).toHaveText(firstId!);
   await expect(page.getByTestId("event-row")).toHaveCount(15);
+  await page
+    .getByRole("button", { name: "Recordings & storage", exact: true })
+    .click();
   await page.getByRole("button", { name: `Inspect run ${secondId}` }).click();
   await expect(page.getByTestId("run-id")).toHaveText(secondId!);
   await expect(page.getByText("Recorded", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Recordings & storage", exact: true })
+    .click();
   await page.getByRole("button", { name: `Inspect run ${firstId}` }).click();
   await expect(page.getByTestId("run-id")).toHaveText(firstId!);
   await seekToEnd(page);
 
+  await page
+    .getByRole("button", { name: "Recordings & storage", exact: true })
+    .click();
   await page.route("**/api/runs?*", (route) => route.abort());
   await page.getByRole("button", { name: "Refresh runs", exact: true }).click();
   await expect(
@@ -239,6 +256,7 @@ test("starts, watches, reloads and inspects isolated seeded recordings", async (
       }),
     }),
   );
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await page.getByRole("button", { name: "Start run", exact: true }).click();
   await expect(
     page.getByRole("alert").filter({ hasText: "Recording storage" }),
@@ -255,7 +273,7 @@ test("starts, watches, reloads and inspects isolated seeded recordings", async (
     page.getByRole("button", { name: "Start run", exact: true }),
   ).toBeEnabled();
   await expect(
-    page.getByText("No run selected.", { exact: false }),
+    page.getByRole("heading", { name: "Start a recorded run.", exact: true }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -267,8 +285,10 @@ test("inspects organization history, held snapshot evidence and both comparison 
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await page.getByLabel("Seed", { exact: true }).fill("m2-browser");
   await page.getByLabel("Duration (simulation seconds)").fill("9");
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await page.getByLabel("Comparison fixture").selectOption("credential-attack");
   await page.getByRole("button", { name: "Start run", exact: true }).click();
   await expect(
@@ -312,6 +332,9 @@ test("inspects organization history, held snapshot evidence and both comparison 
     timeout: 15_000,
   });
   await seekToEnd(page);
+  await page
+    .getByRole("button", { name: "Return to playback", exact: true })
+    .click();
   await expect(page.getByTestId("window-boundary")).toContainText(
     "snapshot-000010",
   );
@@ -372,6 +395,8 @@ test("inspects organization history, held snapshot evidence and both comparison 
     ),
   ).toBe(true);
   const attackId = await page.getByTestId("run-id").textContent();
+  await page.getByRole("button", { name: "New run", exact: true }).click();
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await page.getByLabel("Comparison fixture").selectOption("harmless-anomaly");
   await page.getByRole("button", { name: "Start run", exact: true }).click();
   await expect(page.getByTestId("run-id")).not.toHaveText(attackId!);
@@ -408,9 +433,11 @@ test("launches the full sequence, inspects second-host evidence and retains unav
 }) => {
   test.setTimeout(90_000);
   await page.goto("/");
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Start run", exact: true }),
   ).toBeEnabled();
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await page
     .getByLabel("Comparison fixture")
     .selectOption("credential-compromise");
@@ -439,6 +466,9 @@ test("launches the full sequence, inspects second-host evidence and retains unav
     "begin-injection",
     "stop-injection",
   ]);
+  await page
+    .getByRole("button", { name: "Simulation & details", exact: true })
+    .click();
   await page.getByText("Manifest and command log", { exact: true }).click();
   await expect(
     page.locator("pre").filter({ hasText: '"stop-injection"' }),
@@ -465,6 +495,9 @@ test("launches the full sequence, inspects second-host evidence and retains unav
     { data: { runIds: [id] } },
   );
   expect(response.status()).toBe(201);
+  await page
+    .getByRole("button", { name: "Evaluation reports", exact: true })
+    .click();
   await page.getByText(/Model evaluation reports \(/).click();
   await page.getByRole("button", { name: "Refresh reports" }).click();
   await page.getByText(/1 runs · scenario-metrics\/1/).click();
@@ -481,6 +514,7 @@ test("launches the full sequence, inspects second-host evidence and retains unav
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await page
     .getByLabel("Comparison fixture")
     .selectOption("benign-maintenance");
@@ -531,9 +565,13 @@ test("controls an interactive run, retries a lost acknowledgement and recovers s
     });
   });
   await page.goto("/");
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await page.getByLabel("Interactive mode", { exact: false }).check();
   await page.getByLabel("Duration (simulation seconds)").fill("20");
   await page.getByRole("button", { name: "Start run", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Simulation & details", exact: true })
+    .click();
   const pause = page.getByRole("button", { name: "Pause", exact: true });
   await expect(pause).toBeEnabled();
   const original = (await page.getByTestId("run-id").textContent())!;
@@ -589,6 +627,9 @@ test("controls an interactive run, retries a lost acknowledgement and recovers s
     ),
   ).toBe(true);
   await page.reload();
+  await page
+    .getByRole("button", { name: "Simulation & details", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Resume", exact: true }),
   ).toBeEnabled();
@@ -628,6 +669,9 @@ test("controls an interactive run, retries a lost acknowledgement and recovers s
   ).toBeVisible({ timeout: 10000 });
   await page.getByRole("button", { name: "View active run" }).click();
   await expect(page.getByTestId("run-id")).toHaveText(reset.run.id);
+  await page
+    .getByRole("button", { name: "Simulation & details", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Resume", exact: true }),
   ).toBeEnabled();
@@ -637,6 +681,9 @@ test("controls an interactive run, retries a lost acknowledgement and recovers s
   await expect(page.getByTestId("event-count")).toHaveText("4500");
   await page.getByRole("button", { name: "Reset run", exact: true }).click();
   await expect(page.getByTestId("run-id")).not.toHaveText(reset.run.id);
+  await page
+    .getByRole("button", { name: "Simulation & details", exact: true })
+    .click();
   await expect(pause).toBeEnabled();
   await page
     .getByRole("combobox", { name: "Requested speed", exact: true })
@@ -650,6 +697,7 @@ test("plays, seeks, reproduces and reevaluates a saved recording", async ({
   page,
 }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "New run", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Start run", exact: true }),
   ).toBeEnabled();
@@ -658,6 +706,7 @@ test("plays, seeks, reproduces and reevaluates a saved recording", async ({
   await page.getByRole("button", { name: "Start run", exact: true }).click();
   await expect(page.getByText("Completed", { exact: true })).toBeVisible();
   const sourceId = await page.getByTestId("run-id").textContent();
+  await page.reload();
 
   await expect(
     page.getByText("Recorded playback · offline · simulation read-only", {
@@ -678,6 +727,9 @@ test("plays, seeks, reproduces and reevaluates a saved recording", async ({
   await page.getByLabel("Recording timeline").fill("2000");
   await expect(page.getByTestId("event-row")).toHaveCount(10);
 
+  await page
+    .getByRole("button", { name: "Simulation & details", exact: true })
+    .click();
   await page.getByRole("button", { name: "Reproduce telemetry" }).click();
   await expect(
     page.getByRole("heading", { name: "Deterministic telemetry rerun" }),
@@ -689,6 +741,9 @@ test("plays, seeks, reproduces and reevaluates a saved recording", async ({
   await page.getByRole("button", { name: "View source recording" }).click();
   await expect(page.getByTestId("run-id")).toHaveText(sourceId!);
 
+  await page
+    .getByRole("button", { name: "Simulation & details", exact: true })
+    .click();
   await page.getByRole("button", { name: "Reevaluate with Jev" }).click();
   await expect(
     page.getByRole("heading", { name: "Fresh Jev reevaluation" }),

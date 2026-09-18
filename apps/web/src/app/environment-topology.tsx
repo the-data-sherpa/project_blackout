@@ -185,7 +185,7 @@ export function EnvironmentTopology({
             Entity color never uses scenario truth or a global model score.
           </p>
         </div>
-        <div className="rounded border border-violet-400/40 bg-violet-950/20 px-3 py-2 text-sm">
+        <div className="topology-assessment rounded border border-violet-400/40 bg-violet-950/20 px-3 py-2 text-sm">
           <span className="block text-xs uppercase tracking-wide text-violet-200">
             Global Jev assessment · separate
           </span>

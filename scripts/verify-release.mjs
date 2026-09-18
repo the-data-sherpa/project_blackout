@@ -131,6 +131,9 @@ try {
       ...extra,
     });
   await page.goto(`${webBase}/?run=${id}`);
+  await page
+    .getByRole("button", { name: "Simulation & details", exact: true })
+    .click();
   await page.getByRole("button", { name: "Pause", exact: true }).waitFor();
   await until(
     () => page.getByRole("button", { name: "Pause", exact: true }).isEnabled(),
@@ -191,6 +194,9 @@ try {
   const reset = await command("reset");
   assert.deepEqual((await api(`/api/runs/${id}`)).events, retained.events);
   await page.goto(`${webBase}/?run=${reset.run.id}`);
+  await page
+    .getByRole("button", { name: "Simulation & details", exact: true })
+    .click();
   await page.getByRole("button", { name: "Pause", exact: true }).waitFor();
   await compose("stop", "server");
   await until(

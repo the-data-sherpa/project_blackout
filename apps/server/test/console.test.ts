@@ -24,6 +24,10 @@ import {
   visibleAttempts,
 } from "../../web/src/app/decision-view.js";
 import { receiveRunMessage } from "../../web/src/app/run-stream.js";
+import {
+  inspectAssessment,
+  newerAssessmentCount,
+} from "../../web/src/app/playback.js";
 
 const cleanup: (() => unknown)[] = [];
 afterEach(async () => {
@@ -434,4 +438,133 @@ it("expires all injected evidence after a full 15 simulation minutes while basel
   expect(references(expiry).length).toBeGreaterThan(0);
   expect(investigationStatus(recordings.investigationHistory(id))).toBe("open");
   expect(recordings.get(id)).toEqual(saved);
+});
+
+it("pins persisted evidence, decisions and investigation while streamed success and failure continue", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "blackout-inspection-"));
+  cleanup.push(() => rmSync(directory, { recursive: true, force: true }));
+  const filename = join(directory, "recording.sqlite");
+  let calls = 0;
+  const { runs, recordings } = store(
+    {
+      config: { ...defaultEvaluation, maxAttempts: 1 },
+      fetch: async () => {
+        calls++;
+        return calls === 3
+          ? Response.json({ invalid: true })
+          : Response.json(response(calls === 1 ? 0.1 : 0.9));
+      },
+    },
+    filename,
+  );
+  const id = runs.start({
+    seed: "shared-inspection",
+    durationSeconds: 15,
+    evaluate: true,
+  }).run.id;
+  await runs.settled();
+  let client = recordings.get(id)!;
+  runs.subscribe((message) => {
+    client = receiveRunMessage(client, message, id)!;
+  });
+  const first = inspectAssessment(client, client.attempts[0]!.id)!;
+  const frozen = JSON.stringify(first);
+  await advance(runs, 5);
+  expect(client).toEqual(recordings.get(id));
+  expect(newerAssessmentCount(client, first)).toBe(1);
+  expect(
+    first.recording.events.every((event) => event.simulationTimeMs <= 0),
+  ).toBe(true);
+  expect(first.recording.snapshots).toHaveLength(1);
+  expect(first.recording.investigationHistory).toHaveLength(0);
+  expect(decisionMetrics(first.recording).decisions).toBe(1);
+  const secondId = client.attempts[1]!.id;
+  runs.investigate(id, action("acknowledge", 1));
+  runs.investigate(id, action("close", 2));
+  const second = inspectAssessment(client, secondId)!;
+  expect(investigationStatus(second.recording.investigationHistory)).toBe(
+    "open",
+  );
+  await advance(runs, 5);
+  expect(client.attempts.at(-1)!.status).toBe("failed");
+  expect(newerAssessmentCount(client, first)).toBe(1);
+  await advance(runs, 5);
+  expect(newerAssessmentCount(client, first)).toBe(2);
+  expect(JSON.stringify(first)).toBe(frozen);
+  expect(investigationStatus(client.investigationHistory)).toBe("open");
+  const reopened = openDatabase(filename);
+  try {
+    const persisted = new Recordings(reopened).get(id)!;
+    const restored = inspectAssessment(persisted, secondId)!;
+    expect(restored.assessment).toEqual(second.assessment);
+    expect(restored.recording.events).toEqual(second.recording.events);
+    expect(restored.recording.snapshots).toEqual(second.recording.snapshots);
+    expect(restored.recording.attempts).toEqual(second.recording.attempts);
+    expect(restored.recording.investigationHistory).toEqual(
+      second.recording.investigationHistory,
+    );
+    expect(inspectAssessment(persisted, randomUUID())).toBeNull();
+  } finally {
+    reopened.close();
+  }
+  expect(calls).toBe(4);
+});
+
+it("keeps a held response inspectable without future application leaking into the pinned view", async () => {
+  let resolve!: (response: Response) => void;
+  const { runs, recordings } = store({
+    fetch: () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  });
+  const id = runs.start({
+    seed: "held-inspection",
+    durationSeconds: 1,
+    evaluate: true,
+  }).run.id;
+  runs.control(id, { commandId: randomUUID(), type: "pause" });
+  resolve(Response.json(response()));
+  await runs.settled();
+  const held = recordings.get(id)!;
+  const inspection = inspectAssessment(held, held.attempts[0]!.id)!;
+  expect(inspection.assessment!.response).not.toBeNull();
+  expect(inspection.assessment!.appliedAt).toBeNull();
+  expect(inspection.recording.investigationHistory).toHaveLength(0);
+  expect(decisionMetrics(inspection.recording).decisions).toBe(0);
+  runs.control(id, { commandId: randomUUID(), type: "resume" });
+  const applied = recordings.get(id)!;
+  expect(newerAssessmentCount(applied, inspection)).toBe(1);
+  expect(inspection.assessment!.appliedAt).toBeNull();
+  expect(inspection.recording.investigationHistory).toHaveLength(0);
+  expect(
+    investigationStatus(
+      inspectAssessment(applied, applied.attempts[0]!.id)!.recording
+        .investigationHistory,
+    ),
+  ).toBe("open");
+  const legacy = recordingSchema.parse({
+    ...applied,
+    attempts: applied.attempts.map((attempt) => ({
+      ...attempt,
+      appliedAt: undefined,
+      appliedSimulationTimeMs: undefined,
+    })),
+  });
+  expect(
+    decisionMetrics(
+      inspectAssessment(legacy, legacy.attempts[0]!.id)!.recording,
+    ).decisions,
+  ).toBe(1);
+  const delayed = recordingSchema.parse({
+    ...applied,
+    attempts: applied.attempts.map((attempt) => ({
+      ...attempt,
+      appliedSimulationTimeMs: 1000,
+    })),
+  });
+  const atCheckpoint = inspectAssessment(delayed, delayed.attempts[0]!.id)!;
+  expect(atCheckpoint.assessment!.response).not.toBeNull();
+  expect(atCheckpoint.recording.attempts).toHaveLength(0);
+  expect(atCheckpoint.recording.investigationHistory).toHaveLength(0);
 });

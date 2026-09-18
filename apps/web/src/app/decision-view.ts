@@ -17,9 +17,7 @@ export function visibleAttempts({
         )
       : attempts;
   return liveAttempts.map((attempt) =>
-    run.status === "running" &&
-    attempt.appliedAt === null &&
-    attempt.status !== "pending"
+    attempt.appliedAt === null && attempt.status !== "pending"
       ? {
           ...attempt,
           status: "pending",
