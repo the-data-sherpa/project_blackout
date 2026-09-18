@@ -1,8 +1,8 @@
 # Monitoring workspace
 
-Issues [#33](https://github.com/the-data-sherpa/project_blackout/issues/33) and
-[#34](https://github.com/the-data-sherpa/project_blackout/issues/34) establish the
-shared inspection cursor and the approved monitoring composition. The environment
+Issues #33–#41 implement and verify the shared inspection cursor and monitoring
+composition. See the [acceptance record](MONITORING-ACCEPTANCE.md) for the offline
+walkthrough, measured budgets, coverage and known limitations. The environment
 uses recorded entity evidence; the four SystemOne summaries describe the global
 assessment. The recorded decision path links to events, observable input, the
 exact response and policy, and investigation history. These are application
@@ -32,9 +32,21 @@ inspection and its final playback position.
 - **Recordings & storage** retains pagination, storage accounting, and confirmed
   deletion. Selecting a recording updates the entire workspace.
 - **Evaluation reports** retains saved evaluation results and their evidence links.
-- **Simulation & details** opens the existing simulation controls, manifest,
-  command log, telemetry rerun, and fresh reevaluation tools. Rerun and
-  reevaluation remain explicit actions; reevaluation still uses API credits.
+- The compact **Recording** selector switches among the loaded recording page;
+  **Browse all recordings** opens the paginated browser for older recordings.
+- **Pause simulation**, **Resume simulation**, and **Simulation speed** control
+  the active server run. **Play recording**, **Pause playback**, and playback
+  **Speed** affect only the client. Historical inspection does not pause either
+  transport. Opening a historical link starts paused.
+- **Simulation & details** opens **Simulation controls** on an active run: choose
+  a scenario, begin/stop injection, reset, or open new-run setup. Scenario and
+  injection status remain visible when collapsed. On a saved run it opens
+  recording details, including explicit reset, manifest, command log, telemetry
+  rerun, and fresh reevaluation. Reevaluation uses API credits.
+- Investigation status and acknowledge/close actions appear below the graph.
+  Historical inspection is read-only. Return to live, or to the end of playback,
+  to act. Repeated matching judgments do not create duplicate cases; a matching
+  judgment after closure reopens the same history. Cessation never closes it.
 
 Selecting a judgment summary pins its applied assessment and opens the exact
 inspector. The decision path buttons focus their corresponding detail sections.
@@ -114,5 +126,74 @@ coverage retains the relationship, animation, seek and heap budgets and tests
 legacy recordings and the packaged real-response demo. These deterministic
 test responses do not measure model accuracy.
 
-Detailed graph interactions, compact operator controls, richer health semantics,
-and complete shareable inspection state remain separate tickets (#37–#40).
+## Recorded decision graph
+
+The compact path summarizes observations → snapshot → four judgments → policy →
+investigation. **Expand decision path** reveals every output and every stored
+condition, including the review fallback, unmatched conditions and unevaluable
+inputs. All incident gates must match; advisory response is not a fifth incident
+gate. The graph uses recorded expressions and policy version, so custom thresholds
+and older policies retain their meaning.
+
+Select a node for exact available questions, answers, comparisons and timing.
+**Open full inspector** reaches its recorded detail. **Open recorded members**
+clears entity/text/type restrictions and searches observations through the graph's
+snapshot, including warm-up. Snapshot aggregates link their contributing members
+in the existing evidence inspector. No graph interaction requests inference.
+
+Received/held results are explicitly not applied and cannot claim a transition.
+The transition node identifies the selected attempt's actual event, or says that
+it caused none. It shows the most recent five history events; the investigation
+panel retains the full ordered history and triggering-decision links. Legacy
+application timing is identified as unavailable rather than reconstructed.
+
+## Health and freshness
+
+The top strip describes the current live run independently of historical
+inspection, or the recorded end state for saved playback. The inspection strip
+separately describes the assessment at the viewed cursor. Connection labels come
+from the stream's Connected, Disconnected and Resynchronizing states; controls
+remain disabled until synchronization succeeds. Saved playback explicitly has
+no live transport.
+
+Telemetry becomes quiet/stale after more than 30 **simulation seconds** without
+an observation. Pausing or waiting for inference does not consume simulation time
+or prove a broken connection. The browser's most recent telemetry receipt age is
+in **wall seconds**, while request latency comes from the recorded wall-time
+measurement. Missing latency is unknown. The expandable timing detail gives the
+last applied success, its receipt timestamp and its simulation-time age.
+
+Pending, retrying, received/held, applied success, failed/unavailable and
+never-evaluated states are distinct. A failure retains the prior successful
+judgment and labels it stale; it cannot turn unknown risk into zero risk.
+
+## Exact inspection links
+
+**Copy inspection link** copies a historical URL for the currently viewed
+checkpoint, recording, selected decision and judgment card, selected entity and
+event, and all event filters. A success message confirms copying. If clipboard
+access fails, a selectable URL provides a manual fallback.
+
+The view URL uses `view=1`, integer simulation milliseconds in `time`, stable
+`run`, `decision`, `judgment`, `entity` and `event` references, plus `q`, `type`,
+`period`, `from` and `through` filters. Optional `phase` preserves a pending or
+received/held decision even if that attempt subsequently applies. Copied links
+also include `boundary=1`, the latest `attempt` and `atPhase`, and the last included
+`history` and `commands` sequence numbers. These preserve a pending or held view
+even without a selected decision, and exclude later operator actions that happen
+at the same simulation timestamp. No request or
+event payloads or credentials are included. The destination still needs access
+to the same recording; a copied link does not transfer a database.
+
+The URL restores after refresh and browser back/forward navigation. Explicit
+view changes add history entries; live ticks add none. Copying freezes the link's
+cursor without changing the current transport or issuing a server command.
+Existing `?run=…&decision=…` links still resolve to the decision's recorded
+checkpoint. Return to live clears the historical cursor and decision selection.
+
+A missing recording gives recovery to setup. Invalid checkpoints pin to zero
+with a notice. Unavailable decisions or events are cleared explicitly; unknown
+entity filters remain restrictive and show no future evidence. Invalid time
+filters retain the existing validation error. A mismatched decision/cursor clears
+the decision and retains the requested valid cursor. An inconsistent explicit
+boundary pins to zero with a recovery notice.

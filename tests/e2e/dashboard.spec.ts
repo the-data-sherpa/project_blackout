@@ -471,6 +471,30 @@ test("opens a historical judgment link while live simulation continues and prese
     );
     expect(new URL(page.url()).searchParams.has("decision")).toBe(false);
     expect(new URL(page.url()).searchParams.has("time")).toBe(false);
+    for (let i = 0; i < 3; i++) tick();
+    await expect(page.getByTestId("inspection-position")).toHaveText(
+      "Following live · 8.0 s",
+    );
+    await page
+      .getByRole("button", { name: "Expand decision path", exact: true })
+      .click();
+    await page
+      .getByTestId("processing-zone")
+      .getByRole("button", { name: /Compromise probability 90/ })
+      .click();
+    await page
+      .getByRole("button", { name: "Open full inspector", exact: true })
+      .click();
+    await expect(page.getByTestId("inspection-position")).toHaveText(
+      "Inspecting checkpoint · 5.0 s",
+    );
+    await page.reload();
+    await expect(page.getByTestId("inspection-position")).toHaveText(
+      "Inspecting checkpoint · 5.0 s",
+    );
+    await expect(page.getByText(/linked decision does not belong/)).toHaveCount(
+      0,
+    );
     expect((await read()).run.controls!.paused).toBe(false);
     expect(mutations).toHaveLength(0);
     expect(calls).toBe(2);

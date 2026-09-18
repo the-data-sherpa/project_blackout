@@ -69,6 +69,12 @@ round-trip equality and foreign keys before writing the archive.
 
 ## Presenter walkthrough
 
+The completed monitoring workspace has a [step-by-step operator guide](MONITORING-WORKSPACE.md)
+and a [measured acceptance record](MONITORING-ACCEPTANCE.md). Its graph expansion,
+inspection links, compact transport controls and health labels work with this same
+packaged archive. The deterministic tests use controlled model responses; the
+offline rehearsal below displays only the archive's original Jev responses.
+
 1. Open the saved attack recording. State that this is **recorded playback**
    of actual model responses. Seek to zero and show baseline history, the five
    window boundaries, and the exact evaluator input.
@@ -85,7 +91,7 @@ round-trip equality and foreign keys before writing the archive.
    switches as well as detections. Do not present confidence as accuracy.
 5. For live use, enable **Interactive mode** and **Evaluate with Jev**, choose
    a seed and 95-second duration, and start. After baseline observations, choose
-   **Begin Attack**. Inspect escalation, **Pause**, select evidence, **Resume**,
+   **Begin Attack**. Inspect escalation, **Pause simulation**, select evidence, **Resume simulation**,
    then **Stop Attack** while injection is active. Baseline continues. If the
    model misses the scenario, show that outcome. No decision is forced.
 6. Explain **Reset run**: it creates another recording and retains the previous

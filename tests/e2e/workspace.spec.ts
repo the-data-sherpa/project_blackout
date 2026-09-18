@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { expect, test, type Page } from "@playwright/test";
-import { commandSchema, startRunSchema } from "@blackout/contracts";
+import {
+  commandSchema,
+  startRunSchema,
+  recordingSchema,
+} from "@blackout/contracts";
 import { openDatabase } from "../../apps/server/src/database.js";
 import { Recordings } from "../../apps/server/src/recordings.js";
 import {
@@ -226,7 +230,7 @@ test("renders the packaged real-response recording offline in three zones and st
     await expect(
       page
         .getByTestId("processing-zone")
-        .getByRole("button", { name: /01 \/ Evidence/ }),
+        .getByRole("button", { name: /Recorded events/ }),
     ).toBeVisible();
     await page.screenshot({
       path: "test-results/workspace-mobile.png",
@@ -238,6 +242,74 @@ test("renders the packaged real-response recording offline in three zones and st
     await expect(
       page.getByRole("button", { name: "New run", exact: true }),
     ).toBeFocused();
+
+    const manifest = JSON.parse(readFileSync("demo/manifest.json", "utf8"));
+    const rehearsal = [];
+    for (const run of manifest.runs) {
+      const saved = recordingSchema.parse(
+        (await app.inject(`/api/runs/${run.id}`)).json(),
+      );
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.goto(`/?run=${run.id}`);
+      const checkpoints = [];
+      for (const time of [0, 5000, 15000, 30000, 35000, 95000]) {
+        await page.getByLabel("Recording timeline").fill(String(time));
+        const actual = saved.attempts.findLast(
+          (attempt) =>
+            attempt.simulationTimeMs <= time &&
+            attempt.status === "succeeded" &&
+            attempt.appliedAt !== null,
+        )!;
+        const values = [
+          `${(actual.response!.answers.compromise.noul * 100).toFixed(1)}%`,
+          actual.response!.answers.classification.choice,
+          `${actual.response!.answers.severity.score.toFixed(2)} / 3`,
+          actual.response!.answers.response.choice,
+        ];
+        await expect(page.getByTestId("judgment-value")).toHaveText(values);
+        checkpoints.push({
+          cursorMs: time,
+          attemptId: actual.id,
+          model: actual.response!.model,
+          values,
+          policy: actual.policy!.outcome,
+        });
+      }
+      await page
+        .getByRole("button", { name: "Expand decision path", exact: true })
+        .click();
+      await page
+        .getByTestId("processing-zone")
+        .getByRole("button", { name: /compromise probability >=/ })
+        .click();
+      await expect(
+        page.getByRole("region", { name: "Decision path detail" }),
+      ).toContainText("advisory-policy/2");
+      rehearsal.push({
+        fixture: run.fixture,
+        runId: run.id,
+        checkpoints,
+        investigationTransitions: saved.investigationHistory.map((event) => ({
+          type: event.type,
+          timeMs: event.simulationTimeMs,
+        })),
+      });
+    }
+    writeFileSync(
+      "test-results/monitoring-offline-rehearsal.json",
+      JSON.stringify(
+        {
+          recordedAt: new Date().toISOString(),
+          keyConfigured: (await app.inject("/api/evaluator")).json().configured,
+          modelCalls,
+          mutations: requests.filter((method) => method !== "GET").length,
+          rehearsal,
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+
     expect(requests.every((method) => method === "GET")).toBe(true);
     expect(modelCalls).toBe(0);
   } finally {

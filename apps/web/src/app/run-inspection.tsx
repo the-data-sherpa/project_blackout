@@ -297,21 +297,7 @@ export function RunInspection({
       <ProcessingOverview
         recording={projected}
         assessment={inspection?.assessment ?? null}
-        onInspect={(id) => {
-          const assessment =
-            inspection?.assessment?.id === id
-              ? inspection.assessment
-              : projected.attempts.find((attempt) => attempt.id === id);
-          if (assessment)
-            update(
-              {
-                decision: id,
-                phase: assessmentPhase(assessment),
-                judgment: null,
-              },
-              { recording: projected, assessment },
-            );
-        }}
+        onInspect={select}
         onEvidence={(throughMs) =>
           update({
             entity: null,

@@ -34,14 +34,9 @@ import {
 import {
   inspectAssessment,
   inspectionBoundary,
+  inspectBoundary,
   newerAssessmentCount,
 } from "../../web/src/app/playback.js";
-
-import {
-  defaultInspectionView,
-  inspectionUrl,
-  restoreInspection,
-} from "../../web/src/app/inspection-link.js";
 
 const cleanup: (() => unknown)[] = [];
 afterEach(async () => {
@@ -737,7 +732,7 @@ it("keeps a held response inspectable without future application leaking into th
   expect(atCheckpoint.recording.investigationHistory).toHaveLength(0);
 });
 
-it("restores pending and held inspection boundaries independently of later operator actions or optional selection", async () => {
+it("restores pending and held inspection boundaries independently of later operator actions", async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   try {
     vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
@@ -760,35 +755,17 @@ it("restores pending and held inspection boundaries independently of later opera
     vi.setSystemTime(new Date("2026-01-01T00:00:05Z"));
     for (let i = 0; i < 5; i++) runs.tick();
     const pending = recordings.get(id)!;
-    const pendingUrl = inspectionUrl(
-      "http://localhost/",
-      id,
-      defaultInspectionView,
-      5000,
-      inspectionBoundary(pending),
-    );
+    const pendingBoundary = inspectionBoundary(pending);
     runs.control(id, { commandId: randomUUID(), type: "pause" });
     vi.setSystemTime(new Date("2026-01-01T00:00:10Z"));
     receive(Response.json(response()));
     await runs.settled();
     const held = recordings.get(id)!;
-    const heldUrl = inspectionUrl(
-      "http://localhost/",
-      id,
-      defaultInspectionView,
-      5000,
-      inspectionBoundary(held),
-    );
+    const heldBoundary = inspectionBoundary(held);
     vi.setSystemTime(new Date("2026-01-01T00:00:15Z"));
     runs.investigate(id, action("close", 1));
     const closedHeld = recordings.get(id)!;
-    const closedUrl = inspectionUrl(
-      "http://localhost/",
-      id,
-      defaultInspectionView,
-      5000,
-      inspectionBoundary(closedHeld),
-    );
+    const closedBoundary = inspectionBoundary(closedHeld);
     vi.setSystemTime(new Date("2026-01-01T00:00:20Z"));
     runs.control(id, { commandId: randomUUID(), type: "resume" });
     const applied = recordings.get(id)!;
@@ -797,34 +774,27 @@ it("restores pending and held inspection boundaries independently of later opera
       "closed",
       "reopened",
     ]);
-    const pendingView = restoreInspection(pendingUrl, applied);
-    expect(pendingView.state.decision).toBeNull();
-    expect(pendingView.inspection!.recording.attempts.at(-1)).toMatchObject({
+    const pendingView = inspectBoundary(applied, 5000, pendingBoundary)!;
+    expect(pendingView.attempts.at(-1)).toMatchObject({
       status: "pending",
       response: null,
       appliedAt: null,
     });
-    expect(
-      pendingView.inspection!.recording.investigationHistory.map(
-        (event) => event.type,
-      ),
-    ).toEqual(["opened"]);
-    const heldView = restoreInspection(heldUrl, applied);
-    expect(heldView.state.decision).toBeNull();
-    expect(heldView.inspection!.recording.attempts.at(-1)).toMatchObject({
+    expect(pendingView.investigationHistory.map((event) => event.type)).toEqual(
+      ["opened"],
+    );
+    const heldView = inspectBoundary(applied, 5000, heldBoundary)!;
+    expect(heldView.attempts.at(-1)).toMatchObject({
       status: "succeeded",
       appliedAt: null,
     });
+    expect(heldView.investigationHistory.map((event) => event.type)).toEqual([
+      "opened",
+    ]);
     expect(
-      heldView.inspection!.recording.investigationHistory.map(
+      inspectBoundary(applied, 5000, closedBoundary)!.investigationHistory.map(
         (event) => event.type,
       ),
-    ).toEqual(["opened"]);
-    expect(
-      restoreInspection(
-        closedUrl,
-        applied,
-      ).inspection!.recording.investigationHistory.map((event) => event.type),
     ).toEqual(["opened", "closed"]);
     for (const phase of ["pending", "received"] as const) {
       expect(

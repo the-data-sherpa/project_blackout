@@ -1,6 +1,9 @@
+import { cpus, totalmem, platform, release } from "node:os";
+import { writeFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { recordingSchema } from "@blackout/contracts";
 import { buildApp } from "../../apps/server/src/app.js";
+import { buildTopology } from "../../apps/web/src/app/topology.js";
 
 const mebibyte = 1024 * 1024;
 
@@ -123,6 +126,80 @@ test("keeps evidence topology synchronized and bounded through a full recording"
     )?.value;
     expect(heap).toBeDefined();
     expect(heap!).toBeLessThan(128 * mebibyte);
+    const measurement = {
+      recordedAt: new Date().toISOString(),
+      browser: page.context().browser()!.version(),
+      platform: platform(),
+      osRelease: release(),
+      cpu: cpus()[0]?.model,
+      logicalCpus: cpus().length,
+      memoryGiB: Number((totalmem() / 1024 ** 3).toFixed(1)),
+      viewport: page.viewportSize(),
+      durationMs: saved.run.simulationTimeMs,
+      events: saved.events.length,
+      eventRows: await page.getByTestId("event-row").count(),
+      relationships: await page.getByTestId("topology-relationship").count(),
+      seekToRenderMs: Number(seekRenderMs.toFixed(2)),
+      heapMiB: Number((heap! / mebibyte).toFixed(2)),
+    };
+    const organization =
+      saved.run.manifest.schemaVersion === 2
+        ? saved.run.manifest.organization
+        : null;
+    expect(organization).not.toBeNull();
+    const endIds = new Set(
+      buildTopology(organization!, saved.events, 120_000)
+        .relationships.slice(0, 64)
+        .map((relationship) => relationship.id),
+    );
+    const early = buildTopology(
+      organization!,
+      saved.events,
+      12_000,
+    ).relationships.slice(0, 64);
+    const retainedIndex = early.findIndex(
+      (relationship) => !endIds.has(relationship.id),
+    );
+    expect(retainedIndex).toBeGreaterThanOrEqual(0);
+    await timeline.fill("12000");
+    await page.getByTestId("topology-relationship").nth(retainedIndex).click();
+    await timeline.fill("120000");
+    await expect(page.getByTestId("relationship-budget")).toContainText(
+      "64 + selected",
+    );
+    await expect(page.getByTestId("topology-relationship")).toHaveCount(65);
+
+    await timeline.fill("119000");
+    await page.getByLabel("Speed").selectOption("0.25");
+    await page
+      .getByRole("button", { name: "Play recording", exact: true })
+      .click();
+    await expect(page.locator(".topology-activity").first()).toBeVisible();
+    const animations = await page.locator(".topology-activity").count();
+    expect(animations).toBeLessThanOrEqual(12);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    expect(
+      await page
+        .locator(".topology-activity")
+        .evaluateAll((elements) =>
+          elements.every(
+            (element) => getComputedStyle(element).animationName === "none",
+          ),
+        ),
+    ).toBe(true);
+    await page
+      .getByRole("button", { name: "Pause playback", exact: true })
+      .click();
+    await timeline.fill("120000");
+    Object.assign(measurement, {
+      relationshipsWithRetainedSelection: 65,
+      animations,
+      reducedMotion: true,
+    });
+    writeFileSync(
+      "test-results/monitoring-performance.json",
+      JSON.stringify(measurement, null, 2) + "\n",
+    );
 
     for (const width of [1280, 375, 320]) {
       await page.setViewportSize({ width, height: 900 });
