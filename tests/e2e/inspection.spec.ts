@@ -215,7 +215,7 @@ test("pins every view while real streamed recording continues, including held re
     expect(mutations).toBe(0);
     await page.reload();
     await expect(page.getByTestId("inspection-position")).toHaveText(
-      "Following playback · 0.0 s",
+      "Inspecting checkpoint · 10.0 s",
     );
   } finally {
     await page.close();

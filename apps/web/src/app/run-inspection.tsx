@@ -11,6 +11,8 @@ import { TelemetryInspector } from "./telemetry-inspector";
 import { InvestigationPanel } from "./investigation-panel";
 import {
   inspectAssessment,
+  inspectionBoundary,
+  assessmentPhase,
   newerAssessmentCount,
   type Inspection,
   PlaybackIndex,
@@ -67,6 +69,7 @@ export function RunInspection({
     restored.notice,
   );
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
+  const [copiedUrl, setCopiedUrl] = useState("");
   const selectedId = view.decision;
   const selectedEntityId = view.entity;
   const selectedEventSequence = view.event;
@@ -81,7 +84,14 @@ export function RunInspection({
       window.location.href,
       source.run.id,
       next,
-      nextInspection?.recording.run.simulationTimeMs ?? null,
+      nextInspection?.recording.run.simulationTimeMs ??
+        (source.run.status === "running"
+          ? null
+          : recording.run.simulationTimeMs),
+      inspectionBoundary(
+        nextInspection?.recording ?? recording,
+        nextInspection?.assessment,
+      ),
     );
     if (!pendingUrl.current)
       queueMicrotask(() => {
@@ -93,6 +103,17 @@ export function RunInspection({
     pendingUrl.current = url;
   }
   const projected = inspection?.recording ?? recording;
+  useEffect(() => {
+    if (inspection || source.run.status === "running") return;
+    const url = inspectionUrl(
+      window.location.href,
+      source.run.id,
+      view,
+      recording.run.simulationTimeMs,
+      inspectionBoundary(recording),
+    );
+    window.history.replaceState(null, "", url);
+  }, [recording, source.run.id, source.run.status, inspection, view]);
   const eventSequence = projected.events.some(
     (event) => event.sequence === selectedEventSequence,
   )
@@ -116,16 +137,14 @@ export function RunInspection({
   }
 
   function select(id: string | null, judgment: JudgmentKey | null = null) {
-    const nextInspection = id ? inspectAssessment(source, id) : null;
+    const nextInspection = id
+      ? inspection?.assessment?.id === id
+        ? inspection
+        : inspectAssessment(source, id)
+      : null;
     if (!id) onFollow();
     const assessment = nextInspection?.assessment;
-    const phase = !assessment
-      ? null
-      : assessment.status === "pending"
-        ? "pending"
-        : assessment.appliedAt === null
-          ? "received"
-          : "applied";
+    const phase = assessment ? assessmentPhase(assessment) : null;
     update({ decision: id, judgment, phase }, nextInspection);
   }
 
@@ -151,7 +170,9 @@ export function RunInspection({
       source.run.id,
       { ...view, event: eventSequence },
       projected.run.simulationTimeMs,
+      inspectionBoundary(projected, inspection?.assessment),
     );
+    setCopiedUrl(url.href);
     try {
       await navigator.clipboard.writeText(url.href);
       setCopyNotice("Inspection link copied.");
@@ -222,16 +243,7 @@ export function RunInspection({
               aria-label="Inspection link"
               className="min-h-11 w-full bg-slate-950"
               readOnly
-              value={
-                inspectionUrl(
-                  typeof window === "undefined"
-                    ? "http://localhost"
-                    : window.location.href,
-                  source.run.id,
-                  { ...view, event: eventSequence },
-                  projected.run.simulationTimeMs,
-                ).href
-              }
+              value={copiedUrl}
               onFocus={(event) => event.target.select()}
             />
           )}
@@ -283,7 +295,21 @@ export function RunInspection({
       <ProcessingOverview
         recording={projected}
         assessment={inspection?.assessment ?? null}
-        onInspect={select}
+        onInspect={(id) => {
+          const assessment =
+            inspection?.assessment?.id === id
+              ? inspection.assessment
+              : projected.attempts.find((attempt) => attempt.id === id);
+          if (assessment)
+            update(
+              {
+                decision: id,
+                phase: assessmentPhase(assessment),
+                judgment: null,
+              },
+              { recording: projected, assessment },
+            );
+        }}
         onEvidence={(throughMs) =>
           update({
             entity: null,

@@ -33,8 +33,15 @@ import {
 } from "../../web/src/app/event-search.js";
 import {
   inspectAssessment,
+  inspectionBoundary,
   newerAssessmentCount,
 } from "../../web/src/app/playback.js";
+
+import {
+  defaultInspectionView,
+  inspectionUrl,
+  restoreInspection,
+} from "../../web/src/app/inspection-link.js";
 
 const cleanup: (() => unknown)[] = [];
 afterEach(async () => {
@@ -728,4 +735,107 @@ it("keeps a held response inspectable without future application leaking into th
   expect(atCheckpoint.assessment!.response).not.toBeNull();
   expect(atCheckpoint.recording.attempts).toHaveLength(0);
   expect(atCheckpoint.recording.investigationHistory).toHaveLength(0);
+});
+
+it("restores pending and held inspection boundaries independently of later operator actions or optional selection", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    let calls = 0;
+    let receive!: (response: Response) => void;
+    const { runs, recordings } = store({
+      fetch: async () =>
+        ++calls === 1
+          ? Response.json(response())
+          : new Promise<Response>((resolve) => {
+              receive = resolve;
+            }),
+    });
+    const id = runs.start({
+      seed: "link-phase-boundary",
+      durationSeconds: 20,
+      evaluate: true,
+    }).run.id;
+    await runs.settled();
+    vi.setSystemTime(new Date("2026-01-01T00:00:05Z"));
+    for (let i = 0; i < 5; i++) runs.tick();
+    const pending = recordings.get(id)!;
+    const pendingUrl = inspectionUrl(
+      "http://localhost/",
+      id,
+      defaultInspectionView,
+      5000,
+      inspectionBoundary(pending),
+    );
+    runs.control(id, { commandId: randomUUID(), type: "pause" });
+    vi.setSystemTime(new Date("2026-01-01T00:00:10Z"));
+    receive(Response.json(response()));
+    await runs.settled();
+    const held = recordings.get(id)!;
+    const heldUrl = inspectionUrl(
+      "http://localhost/",
+      id,
+      defaultInspectionView,
+      5000,
+      inspectionBoundary(held),
+    );
+    vi.setSystemTime(new Date("2026-01-01T00:00:15Z"));
+    runs.investigate(id, action("close", 1));
+    const closedHeld = recordings.get(id)!;
+    const closedUrl = inspectionUrl(
+      "http://localhost/",
+      id,
+      defaultInspectionView,
+      5000,
+      inspectionBoundary(closedHeld),
+    );
+    vi.setSystemTime(new Date("2026-01-01T00:00:20Z"));
+    runs.control(id, { commandId: randomUUID(), type: "resume" });
+    const applied = recordings.get(id)!;
+    expect(applied.investigationHistory.map((event) => event.type)).toEqual([
+      "opened",
+      "closed",
+      "reopened",
+    ]);
+    const pendingView = restoreInspection(pendingUrl, applied);
+    expect(pendingView.state.decision).toBeNull();
+    expect(pendingView.inspection!.recording.attempts.at(-1)).toMatchObject({
+      status: "pending",
+      response: null,
+      appliedAt: null,
+    });
+    expect(
+      pendingView.inspection!.recording.investigationHistory.map(
+        (event) => event.type,
+      ),
+    ).toEqual(["opened"]);
+    const heldView = restoreInspection(heldUrl, applied);
+    expect(heldView.state.decision).toBeNull();
+    expect(heldView.inspection!.recording.attempts.at(-1)).toMatchObject({
+      status: "succeeded",
+      appliedAt: null,
+    });
+    expect(
+      heldView.inspection!.recording.investigationHistory.map(
+        (event) => event.type,
+      ),
+    ).toEqual(["opened"]);
+    expect(
+      restoreInspection(
+        closedUrl,
+        applied,
+      ).inspection!.recording.investigationHistory.map((event) => event.type),
+    ).toEqual(["opened", "closed"]);
+    for (const phase of ["pending", "received"] as const) {
+      expect(
+        inspectAssessment(
+          applied,
+          held.attempts.at(-1)!.id,
+          phase,
+        )!.recording.investigationHistory.map((event) => event.type),
+      ).toEqual(["opened"]);
+    }
+  } finally {
+    vi.useRealTimers();
+  }
 });

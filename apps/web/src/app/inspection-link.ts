@@ -4,7 +4,13 @@ import {
   eventEntities,
   type EventFilters,
 } from "./event-search";
-import { inspectAssessment, PlaybackIndex, type Inspection } from "./playback";
+import {
+  inspectAssessment,
+  inspectBoundary,
+  PlaybackIndex,
+  type Inspection,
+  type InspectionBoundary,
+} from "./playback";
 
 export const judgmentKeys = [
   "compromise",
@@ -101,6 +107,66 @@ export function restoreInspection(url: URL, source: Recording) {
     };
     state.decision = null;
   }
+  if (params.has("boundary")) {
+    const phase = params.get("atPhase");
+    const history = Number(params.get("history"));
+    const commands = Number(params.get("commands"));
+    const at = inspection?.recording.run.simulationTimeMs;
+    const valid =
+      params.get("boundary") === "1" &&
+      at !== undefined &&
+      !notices.length &&
+      params.has("history") &&
+      params.has("commands") &&
+      Number.isSafeInteger(history) &&
+      history >= 0 &&
+      Number.isSafeInteger(commands) &&
+      commands >= 0 &&
+      (!params.has("attempt") ||
+        phase === "pending" ||
+        phase === "received" ||
+        phase === "applied");
+    const frozen = valid
+      ? inspectBoundary(source, at, {
+          attemptId: params.get("attempt"),
+          phase:
+            phase === "pending" || phase === "received" || phase === "applied"
+              ? phase
+              : null,
+          historySequence: history,
+          commandSequence: commands,
+        })
+      : null;
+    if (frozen) {
+      const selected =
+        frozen.attempts.find((attempt) => attempt.id === state.decision) ??
+        (state.decision && state.decision === params.get("attempt")
+          ? (inspectAssessment(
+              source,
+              state.decision,
+              phase === "pending" || phase === "received" || phase === "applied"
+                ? phase
+                : null,
+            )?.assessment ?? null)
+          : null);
+      if (state.decision && !selected) {
+        notices.push(
+          "The selected decision is unavailable at the linked boundary. Its selection was cleared.",
+        );
+        state.decision = null;
+      }
+      inspection = { recording: frozen, assessment: selected };
+    } else {
+      notices.push(
+        "The linked inspection boundary is unavailable. Inspection was pinned to the start.",
+      );
+      inspection = {
+        recording: new PlaybackIndex(source).at(0),
+        assessment: null,
+      };
+      state.decision = null;
+    }
+  }
   const judgment = params.get("judgment");
   if (judgmentKeys.some((key) => key === judgment) && state.decision)
     state.judgment = judgment as JudgmentKey;
@@ -170,6 +236,7 @@ export function inspectionUrl(
   runId: string,
   state: InspectionView,
   cursorMs: number | null,
+  boundary?: InspectionBoundary,
 ) {
   const url = new URL(base);
   url.search = "";
@@ -178,6 +245,15 @@ export function inspectionUrl(
   params.set("run", runId);
   params.set("view", "1");
   if (cursorMs !== null) params.set("time", String(cursorMs));
+  if (boundary && cursorMs !== null) {
+    params.set("boundary", "1");
+    params.set("history", String(boundary.historySequence));
+    params.set("commands", String(boundary.commandSequence));
+    if (boundary.attemptId && boundary.phase) {
+      params.set("attempt", boundary.attemptId);
+      params.set("atPhase", boundary.phase);
+    }
+  }
   if (state.decision) params.set("decision", state.decision);
   if (state.decision && state.phase) params.set("phase", state.phase);
   if (state.judgment) params.set("judgment", state.judgment);

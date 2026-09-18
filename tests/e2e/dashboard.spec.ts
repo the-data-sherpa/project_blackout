@@ -80,6 +80,7 @@ async function connect(page: Page, app: Awaited<ReturnType<typeof buildApp>>) {
 
 test("operates the compact workspace and traces held, applied, missing-confidence and failed judgments", async ({
   page,
+  context,
 }) => {
   let tick = () => {};
   let calls = 0;
@@ -156,6 +157,12 @@ test("operates the compact workspace and traces held, applied, missing-confidenc
     await expect(page.getByTestId("investigation-status")).toHaveText(
       "Not opened",
     );
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page
+      .getByRole("button", { name: "Copy inspection link", exact: true })
+      .click();
+    const heldLink = await page.evaluate(() => navigator.clipboard.readText());
+    expect(new URL(heldLink).searchParams.has("decision")).toBe(false);
     await page
       .getByRole("button", { name: "Resume simulation", exact: true })
       .click();
@@ -228,6 +235,26 @@ test("operates the compact workspace and traces held, applied, missing-confidenc
       page.getByLabel("Through time (simulation seconds)"),
     ).toHaveValue("5");
     await expect(page.getByLabel("Activity period")).toHaveValue("all");
+    await page.goto(heldLink);
+    await expect(page.getByTestId("investigation-status")).toHaveText(
+      "Not opened",
+    );
+    await expect(page.getByTestId("inspected-health")).toContainText(
+      "Received / held",
+    );
+    await page
+      .getByRole("button", { name: "Expand decision path", exact: true })
+      .click();
+    await graph
+      .getByRole("button", { name: /Compromise probability 90/ })
+      .click();
+    await page
+      .getByRole("button", { name: "Open full inspector", exact: true })
+      .click();
+    await expect(page.getByText(/Received but not applied\./)).toBeVisible();
+    await expect(page.getByTestId("investigation-status")).toHaveText(
+      "Not opened",
+    );
     expect(mutations).toHaveLength(before);
     expect(calls).toBe(5);
   } finally {
@@ -273,6 +300,17 @@ test("copies and restores exact event filters, selections and checkpoints across
     )!;
     expect(selected.sequence).toBeGreaterThan(50);
     const mutations = await connect(page, app);
+    await page.goto(`/?run=${saved.run.id}`);
+    await page.getByLabel("Recording timeline").fill("60000");
+    await page.getByLabel("Search recorded events").fill(selected.hostId);
+    expect(new URL(page.url()).searchParams.get("time")).toBe("60000");
+    await page.reload();
+    await expect(page.getByTestId("inspection-position")).toHaveText(
+      "Inspecting checkpoint · 60.0 s",
+    );
+    await expect(page.getByLabel("Search recorded events")).toHaveValue(
+      selected.hostId,
+    );
     await page.goto(
       `/?run=${saved.run.id}&time=60000&entity=${selected.hostId}&event=${selected.sequence}&q=${selected.hostId}&type=host-metric&period=all&from=-15&through=60&view=1`,
     );

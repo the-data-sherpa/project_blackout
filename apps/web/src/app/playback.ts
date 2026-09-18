@@ -216,9 +216,11 @@ export function inspectAssessment(
       .filter((attempt) => attempt.appliedAt !== null)
       .map((attempt) => attempt.id),
   );
-  const transition = source.investigationHistory.find(
-    (event) => event.attemptId === id,
-  );
+  const transition =
+    assessment.appliedAt !== null &&
+    (assessment.appliedSimulationTimeMs ?? assessment.simulationTimeMs) <= at
+      ? source.investigationHistory.find((event) => event.attemptId === id)
+      : undefined;
   const investigationHistory = projection.investigationHistory.filter(
     (event) => {
       if (event.attemptId !== null && !appliedIds.has(event.attemptId))
@@ -276,4 +278,129 @@ export function newerAssessmentCount(
       attempt.appliedAt !== null &&
       !visible.has(attempt.id),
   ).length;
+}
+
+export type AssessmentPhase = "pending" | "received" | "applied";
+export type InspectionBoundary = {
+  attemptId: string | null;
+  phase: AssessmentPhase | null;
+  historySequence: number;
+  commandSequence: number;
+};
+
+export function assessmentPhase(attempt: InferenceAttempt): AssessmentPhase {
+  return attempt.status === "pending"
+    ? "pending"
+    : attempt.appliedAt === null
+      ? "received"
+      : "applied";
+}
+
+export function inspectionBoundary(
+  recording: Recording,
+  assessment: InferenceAttempt | null = null,
+): InspectionBoundary {
+  const latest = assessment ?? recording.attempts.at(-1);
+  return {
+    attemptId: latest?.id ?? null,
+    phase: latest ? assessmentPhase(latest) : null,
+    historySequence: recording.investigationHistory.at(-1)?.sequence ?? 0,
+    commandSequence: recording.commands.at(-1)?.sequence ?? 0,
+  };
+}
+
+// Simulation time alone cannot order a paused response and operator actions.
+// Stable sequence cutoffs and the latest attempt's phase describe that boundary.
+export function inspectBoundary(
+  source: Recording,
+  cursor: number,
+  boundary: InspectionBoundary,
+): Recording | null {
+  const index =
+    boundary.attemptId === null
+      ? -1
+      : source.attempts.findIndex(
+          (attempt) => attempt.id === boundary.attemptId,
+        );
+  const saved = source.attempts[index];
+  if (
+    boundary.attemptId !== null &&
+    (!saved || saved.simulationTimeMs > cursor || !boundary.phase)
+  )
+    return null;
+  if (
+    saved &&
+    ((boundary.phase === "received" && saved.status === "pending") ||
+      (boundary.phase === "applied" &&
+        (saved.status === "pending" || saved.appliedAt === null)))
+  )
+    return null;
+  if (
+    boundary.historySequence >
+      (source.investigationHistory.at(-1)?.sequence ?? 0) ||
+    boundary.commandSequence > (source.commands.at(-1)?.sequence ?? 0)
+  )
+    return null;
+  const projected = new PlaybackIndex(source).at(cursor);
+  const attempts = source.attempts
+    .slice(0, index + 1)
+    .filter((attempt) => attempt.simulationTimeMs <= cursor)
+    .map((attempt) => {
+      if (attempt.id !== boundary.attemptId) return attempt;
+      if (boundary.phase === "pending")
+        return {
+          ...attempt,
+          status: "pending" as const,
+          completedAt: null,
+          latencyMs: null,
+          response: null,
+          responseBody: null,
+          error: null,
+          policy: null,
+          appliedAt: null,
+          appliedSimulationTimeMs: null,
+        };
+      if (boundary.phase === "received")
+        return { ...attempt, appliedAt: null, appliedSimulationTimeMs: null };
+      return attempt;
+    })
+    .filter(
+      (attempt) =>
+        attempt.appliedAt === null ||
+        (attempt.appliedSimulationTimeMs ?? attempt.simulationTimeMs) <= cursor,
+    );
+  const appliedIds = new Set(
+    attempts
+      .filter(
+        (attempt) => attempt.status !== "pending" && attempt.appliedAt !== null,
+      )
+      .map((attempt) => attempt.id),
+  );
+  const commands = projected.commands.filter(
+    (command) => command.sequence <= boundary.commandSequence,
+  );
+  return {
+    ...projected,
+    attempts,
+    commands,
+    investigationHistory: projected.investigationHistory.filter(
+      (event) =>
+        event.sequence <= boundary.historySequence &&
+        (event.attemptId === null || appliedIds.has(event.attemptId)),
+    ),
+    run: {
+      ...projected.run,
+      controls: controlsAt(commands, cursor, source),
+      manifest: {
+        ...projected.run.manifest,
+        resolvedModel:
+          [...attempts]
+            .reverse()
+            .find(
+              (attempt) =>
+                attempt.status === "succeeded" && attempt.appliedAt !== null,
+            )?.response?.model ?? null,
+      },
+    },
+  };
 }
